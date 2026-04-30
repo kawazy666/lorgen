@@ -1,0 +1,172 @@
+#!/usr/bin/env bash
+# bin/mimir-compile-metrics  <log-file>
+#
+# Reads .mimir/logs/<session>.jsonl and writes
+# .mimir/metrics/<same-stem>.json. Pure jq transformation: no LLM,
+# no network, no shell expansion of log values. Reference impl of
+# the contract in skills/mimir/metrics.md.
+#
+# Idempotent: re-running on the same log produces byte-identical
+# output. Safe to call from the orphan-log sweep at session start.
+#
+# Usage:
+#   mimir-compile-metrics .mimir/logs/20260429-102345-a3f9c2.jsonl
+#   → writes .mimir/metrics/20260429-102345-a3f9c2.json
+#   → also prints the path to stdout on success.
+
+set -eu
+
+if [[ $# -lt 1 ]]; then
+  echo "usage: $0 <log-file.jsonl>" >&2
+  exit 64
+fi
+
+LOG="$1"
+
+if [[ ! -f "$LOG" ]]; then
+  echo "log file not found: $LOG" >&2
+  exit 66
+fi
+
+# Derive output path from input. Reject malformed log filenames so a
+# poisoned filename cannot redirect output.
+LOG_BASENAME="$(basename "$LOG" .jsonl)"
+if [[ ! "$LOG_BASENAME" =~ ^[0-9]{8}-[0-9]{6}-[A-Za-z0-9_-]+$ ]]; then
+  echo "invalid log filename (must be <YYYYMMDD>-<HHMMSS>-<id>.jsonl): $LOG" >&2
+  exit 65
+fi
+
+LOG_DIR="$(dirname "$LOG")"                 # .mimir/logs
+ROOT="$(dirname "$LOG_DIR")"                # .mimir
+METRICS_DIR="$ROOT/metrics"
+mkdir -p "$METRICS_DIR"
+OUT="$METRICS_DIR/${LOG_BASENAME}.json"
+TMP="${OUT}.tmp.$$"
+
+# Path-key validators (PCRE in jq via test()). Slugs match the regex
+# from schema.md (≤64 chars, leading [a-z0-9], hyphen-separated).
+# Single-quoted bash strings keep backslashes literal: `\.` is sent
+# to jq as two characters (\, .), which jq parses as a regex
+# escape for a literal dot.
+KNOWLEDGE_RE='^\.mimir/knowledge/(conventions|decisions|runbooks|facts|lessons)/[a-z0-9][a-z0-9-]{0,63}\.md$'
+WIKI_RE='^\.mimir/wiki(/[a-z0-9][a-z0-9-]{0,63})*/[a-z0-9][a-z0-9-]{0,63}\.md$'
+
+# --slurpfile reads each JSON value (one per line in JSONL) and binds
+# an array to $evs. So $evs IS the events array — do not index $evs[0].
+jq -n \
+  --slurpfile evs "$LOG" \
+  --arg session "$LOG_BASENAME" \
+  --arg krx "$KNOWLEDGE_RE" \
+  --arg wrx "$WIKI_RE" \
+  '
+  ($evs // []) as $events
+  | ($events | map(select(.event == "knowledge.referenced"))) as $kref
+  | ($events | map(select(.event == "wiki.referenced")))      as $wref
+  | ($events | map(select(.event == "error" and (.fatal // false) == true)) | length) as $fatals
+  | ($events | map(.ts) | sort)                               as $ts
+  | {
+      schema_version: 1,
+      session: $session,
+      started_at: ($ts[0] // null),
+      ended_at:   ($ts[-1] // null),
+      compile_status: (if $fatals > 0 then "partial" else "complete" end),
+
+      knowledge_refs: (
+        $kref
+        | map(select((.path // "") | test($krx)))
+        | group_by(.path)
+        | map({
+            key: .[0].path,
+            value: {
+              refs: length,
+              # Missing `helpful` is coerced to false (per logging.md
+              # contract). This makes the helpful-ratio degrade
+              # visibly when callers forget to emit the field,
+              # rather than silently understating trigger problems.
+              helpful_true:  map(select(.helpful == true))  | length,
+              helpful_false: map(select(.helpful != true))  | length,
+              first_ts: (sort_by(.ts) | .[0].ts),
+              last_ts:  (sort_by(.ts) | .[-1].ts)
+            }
+          })
+        | from_entries
+      ),
+
+      wiki_refs: (
+        $wref
+        | map(select((.path // "") | test($wrx)))
+        | group_by(.path)
+        | map({
+            key: .[0].path,
+            value: {
+              refs: length,
+              helpful_true:  map(select(.helpful == true))  | length,
+              helpful_false: map(select(.helpful != true))  | length,
+              first_ts: (sort_by(.ts) | .[0].ts),
+              last_ts:  (sort_by(.ts) | .[-1].ts)
+            }
+          })
+        | from_entries
+      ),
+
+      retrieved_but_unused: (
+        ($kref | map(select(.helpful != true)) | length)
+        + ($wref | map(select(.helpful != true)) | length)
+      ),
+
+      gates: {
+        save: ($events | map(select(.event=="gate.decision" and .decision=="save")) | length),
+        drop: ($events | map(select(.event=="gate.decision" and .decision=="drop")) | length)
+      },
+
+      dedup: {
+        update:   ($events | map(select(.event=="dedup.decision" and .action=="update"))   | length),
+        create:   ($events | map(select(.event=="dedup.decision" and .action=="create"))   | length),
+        conflict: ($events | map(select(.event=="dedup.decision" and .action=="conflict")) | length),
+        none:     ($events | map(select(.event=="dedup.decision" and .action=="none"))     | length)
+      },
+
+      sources: (
+        $events
+        | map(select(.event=="sources.gathered"))
+        | map(.sources // [])
+        | flatten
+        | group_by(.type // "unknown")
+        | map({
+            key: (.[0].type // "unknown"),
+            value: (
+              [
+                .[]
+                | (.count // (if .refs then (.refs | length) else null end)
+                          // (if .paths then (.paths | length) else null end)
+                          // 1)
+              ] | add
+            )
+          })
+        | from_entries
+      ),
+
+      writes: {
+        knowledge_created: ($events | map(select(.event=="knowledge.created")) | length),
+        knowledge_updated: ($events | map(select(.event=="knowledge.updated")) | length),
+        knowledge_deleted: ($events | map(select(.event=="knowledge.deleted")) | length),
+        wiki_created:      ($events | map(select(.event=="wiki.created"))      | length),
+        wiki_updated:      ($events | map(select(.event=="wiki.updated"))      | length),
+        adr_created:       ($events | map(select(.event=="adr.created"))       | length),
+        adr_superseded:    ($events | map(select(.event=="adr.superseded"))    | length),
+        # Track explicit-record provenance separately from inferred
+        # writes — accumulation pipeline distinguishes "Mimir judged
+        # worth saving" from "user told Mimir to save". Cross-session
+        # tally of user-explicit records is otherwise unrecoverable
+        # once raw logs are gitignored.
+        user_explicit:     ($events | map(select(.event=="record.user_explicit")) | length)
+      },
+
+      errors: (
+        $events | map(select(.event=="error" and (.fatal // false) == false)) | length
+      )
+    }
+  ' >"$TMP"
+
+mv "$TMP" "$OUT"
+echo "$OUT"

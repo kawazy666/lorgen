@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+# bin/mimir-redact
+#
+# Reads stdin, replaces known secret patterns with `[REDACTED:<kind>]`
+# markers, writes to stdout. Used as a pipe before any append into a
+# tracked Mimir file (Knowledge / Wiki / ADR body, ADR file).
+#
+# Same pattern set as `mimir-redact-check`. The check version aborts;
+# this version rewrites. Use the check as the hook gate, this as the
+# defensive wrapper.
+
+set -u
+
+# This wrapper relies on perl. Check perl directly — earlier versions
+# gated on `grep -P` availability, which is false on macOS BSD grep
+# even though perl is installed, causing the wrapper to silently
+# fall through to `cat` and ship secrets verbatim.
+if ! command -v perl >/dev/null 2>&1; then
+  # Defense-in-depth: pass through unchanged. The PreToolUse hook
+  # `mimir-redact-check` is the safety net and uses the same
+  # pattern set in grep ERE form, so leaks caught there will still
+  # block the write.
+  exec cat
+fi
+
+# All substitutions use s!pattern!replacement!g — `!` does not appear
+# in any of the patterns or replacements below, has no special meaning
+# in perl regex, and (unlike `|`, `{}`, `,`) never collides with
+# alternations or `{N,M}` quantifiers.
+perl -pe '
+  # AWS
+  s!AKIA[0-9A-Z]{16}![REDACTED:aws-access-key]!g;
+  s!(?i)aws_secret_access_key(["'\'':\s=]+)[A-Za-z0-9/+=]{40}!aws_secret_access_key${1}[REDACTED:aws-secret]!g;
+  # GitHub family
+  s!ghp_[A-Za-z0-9]{36}![REDACTED:github-pat]!g;
+  s!gho_[A-Za-z0-9]{36}![REDACTED:github-oauth]!g;
+  s!ghs_[A-Za-z0-9]{36}![REDACTED:github-server]!g;
+  s!ghu_[A-Za-z0-9]{36}![REDACTED:github-user-token]!g;
+  s!ghr_[A-Za-z0-9]{36}![REDACTED:github-refresh-token]!g;
+  s!github_pat_[A-Za-z0-9_]{82}![REDACTED:github-fine-grained]!g;
+  # GitLab
+  s!glpat-[A-Za-z0-9_-]{20,}![REDACTED:gitlab-pat]!g;
+  # Slack
+  s!xox[baprs]-[A-Za-z0-9-]{10,}![REDACTED:slack-token]!g;
+  # Google
+  s!AIza[A-Za-z0-9_-]{35}![REDACTED:google-api-key]!g;
+  # Anthropic must come BEFORE the generic sk- pattern, otherwise
+  # sk-ant-... gets caught by the openai branch and mislabelled.
+  s!sk-ant-[A-Za-z0-9_-]{20,}![REDACTED:anthropic]!g;
+  # OpenAI
+  s!sk-(?:proj-)?[A-Za-z0-9_-]{32,}![REDACTED:openai]!g;
+  # Stripe (live + test, both `sk_` and `rk_` prefixes)
+  s!(?:sk|rk)_(?:live|test)_[A-Za-z0-9]{24,}![REDACTED:stripe-key]!g;
+  # npm
+  s!npm_[A-Za-z0-9]{36}![REDACTED:npm-token]!g;
+  # SendGrid
+  s!SG\.[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}![REDACTED:sendgrid]!g;
+  # Twilio (Account SID + Auth Token typically appears as 32-hex)
+  s!AC[0-9a-f]{32}![REDACTED:twilio-sid]!g;
+  s!SK[0-9a-f]{32}![REDACTED:twilio-api-key]!g;
+  # JWT (three base64url segments)
+  s!eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+![REDACTED:jwt]!g;
+  # Private key armours (PEM + OpenSSH)
+  s!-----BEGIN [A-Z ]+PRIVATE KEY-----![REDACTED:pem-private-key]!g;
+  # Bearer tokens
+  s!(?i)(bearer\s+)[A-Za-z0-9._~+/-]{20,}!${1}[REDACTED:bearer]!g;
+  # URL-embedded basic-auth credentials
+  s!(https?://)[^:/\s]+:[^@\s]{4,}@!${1}[REDACTED:basic-auth]@!g;
+  # Generic key=value (covers password / secret / api_key / etc.)
+  s!(?i)((?:api[_-]?key|api[_-]?secret|access[_-]?token|auth[_-]?token|password|passwd|secret)["'\'':\s=]+)["'\'']?[A-Za-z0-9._~+/-]{12,}["'\'']?!${1}[REDACTED:generic-token]!g;
+'

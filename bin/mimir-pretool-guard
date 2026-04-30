@@ -1,0 +1,149 @@
+#!/usr/bin/env bash
+# bin/mimir-pretool-guard
+#
+# Wired as Claude Code's PreToolUse hook for Write|Edit (see hooks/hooks.json).
+# Reads the hook input JSON on stdin, decides whether the tool call is
+# subject to Mimir's redaction guard, and if so, scans the to-be-written
+# content via mimir-redact-check.
+#
+# Hook contract (Anthropic):
+# - Receives JSON on stdin describing the pending tool call.
+# - Exit 0 → tool call proceeds.
+# - Exit non-zero with stderr → tool call is blocked and the message
+#   surfaced to the model.
+#
+# Scope: glob-negation form.
+#   IN scope:    .mimir/**/*  except  .mimir/logs/**, .mimir/cache/**
+#                <outputs.adr_dir>/**  (default docs/adr/, configurable)
+#                docs/decisions/**     (always, since sources.adr_dirs lists it)
+#   OUT of scope: anything else (Mimir does not write outside .mimir/ +
+#                ADR dirs by spec; we don't try to police the rest of
+#                the user's repo).
+
+set -u
+
+input="$(cat)"
+
+# Some Claude Code versions may invoke without input or with an empty payload
+# during plugin load — fail-open in that case.
+if [[ -z "$input" ]]; then
+  exit 0
+fi
+
+# Anchor every path comparison on the project root, NOT $PWD. Claude
+# Code may invoke the hook from any cwd (subdirectory, symlinked path,
+# during a sub-shell). $CLAUDE_PROJECT_DIR is provided by Claude Code
+# 2.x for plugins. Fall back to walking up from $PWD looking for
+# .mimir/, then to $PWD as a last resort.
+project_dir="${CLAUDE_PROJECT_DIR:-}"
+if [[ -z "$project_dir" ]]; then
+  d="$PWD"
+  while [[ "$d" != "/" && "$d" != "" ]]; do
+    if [[ -d "$d/.mimir" ]]; then project_dir="$d"; break; fi
+    d="$(dirname "$d")"
+  done
+  : "${project_dir:=$PWD}"
+fi
+
+# Lazy resolve adr_dir from <project_dir>/.mimir/config.yaml (no yaml
+# parser dependency — regex pull, robust to comments).
+adr_dir="docs/adr"
+if [[ -f "$project_dir/.mimir/config.yaml" ]]; then
+  cfg_adr_dir=$(awk '
+    /^outputs:/      { in_outputs=1; next }
+    /^[a-zA-Z]/      { in_outputs=0 }
+    in_outputs && /^[[:space:]]+adr_dir:/ {
+      sub(/^[^:]+:[[:space:]]*/, "")
+      gsub(/^["'\'']|["'\'']$/, "")
+      print
+      exit
+    }
+  ' "$project_dir/.mimir/config.yaml")
+  if [[ -n "$cfg_adr_dir" ]]; then
+    adr_dir="$cfg_adr_dir"
+  fi
+fi
+
+# Reject obviously suspicious adr_dir values (path traversal /
+# absolute paths / glob metacharacters). Refuse to widen scope to
+# whatever a poisoned config tries to point at. Use glob patterns
+# only — `=~` regex with backslashes inside `[[ ]]` is a footgun
+# (bash strips the backslashes, so `\.\.` becomes `..` = "any two
+# chars" and matches everything).
+if [[ "$adr_dir" == *..* ]] || [[ "$adr_dir" == /* ]] \
+   || [[ "$adr_dir" == *'*'* ]] || [[ "$adr_dir" == *'?'* ]] \
+   || [[ "$adr_dir" == *'['* ]]; then
+  echo "🚫 Mimir refused: outputs.adr_dir contains a suspicious value: $adr_dir" >&2
+  exit 2
+fi
+
+# Extract tool_name and the path being written. We use jq if available,
+# else a defensive grep. jq is universally present in Claude Code envs.
+if command -v jq >/dev/null 2>&1; then
+  tool_name=$(printf '%s' "$input" | jq -r '.tool_name // .tool // empty')
+  file_path=$(printf '%s' "$input" | jq -r '.tool_input.file_path // empty')
+  content=$(printf '%s' "$input" | jq -r '.tool_input.content // .tool_input.new_string // empty')
+else
+  # Fail-open if jq is missing (rare). The `mimir-redact` wrapper
+  # used by skill bash snippets remains as defence. Surface the
+  # missing dependency to stderr — symmetric with how
+  # mimir-redact-check warns when perl is missing — so the gap is
+  # visible rather than silent.
+  echo "⚠️  Mimir warning: jq not found; PreToolUse guard skipped." >&2
+  exit 0
+fi
+
+# Only guard Write / Edit.
+case "$tool_name" in
+  Write|Edit) ;;
+  *) exit 0 ;;
+esac
+
+# Scope check. Compare project-relative paths derived from
+# $project_dir, not from $PWD. file_path may arrive absolute or
+# relative; normalise both forms.
+if [[ "$file_path" == /* ]]; then
+  rel="${file_path#$project_dir/}"
+else
+  rel="${file_path#./}"
+fi
+
+# Mechanical path-traversal defence at the hook layer: refuse any
+# path that contains a `..` segment or a backslash, even if the
+# glob comparison below would otherwise accept it. The slug
+# validation in accumulation.md is instruction-level; this is the
+# matching mechanical backstop. (NUL is unrepresentable in bash
+# strings — `read` / `cat` truncate at NUL — so no separate check.)
+if [[ "$rel" == *..* ]] || [[ "$rel" == *\\* ]]; then
+  echo "🚫 Mimir refused: file_path contains a forbidden segment (.. or \\): $file_path" >&2
+  exit 2
+fi
+
+# If the path is still absolute after stripping, it lives outside the
+# project root. Mimir's writes are always project-relative; reject.
+if [[ "$rel" == /* ]]; then
+  exit 0  # out of scope, not Mimir's territory
+fi
+
+in_scope=0
+
+# .mimir/** but NOT .mimir/logs/** or .mimir/cache/**
+if [[ "$rel" == .mimir/* ]] \
+  && [[ "$rel" != .mimir/logs/* ]] \
+  && [[ "$rel" != .mimir/cache/* ]]; then
+  in_scope=1
+fi
+
+# Configured ADR dir
+if [[ "$rel" == "$adr_dir"/* ]] || [[ "$rel" == docs/decisions/* ]]; then
+  in_scope=1
+fi
+
+if [[ "$in_scope" -ne 1 ]]; then
+  exit 0
+fi
+
+# Pipe content through redact-check. If it exits non-zero, Claude Code
+# blocks the tool call and surfaces stderr to the model.
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+printf '%s' "$content" | "$script_dir/mimir-redact-check"

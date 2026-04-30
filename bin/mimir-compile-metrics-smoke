@@ -1,0 +1,92 @@
+#!/usr/bin/env bash
+# bin/mimir-compile-metrics-smoke
+#
+# Self-contained smoke test for bin/mimir-compile-metrics. Builds three
+# fixtures in a tmpdir, compiles them, asserts the key invariants:
+#
+#   1. multi-event log → knowledge_refs / wiki_refs are populated and
+#      helpful_true / helpful_false are split correctly.
+#   2. re-compile is byte-identical (idempotent).
+#   3. empty log → valid empty schema (started_at / ended_at null,
+#      compile_status "complete").
+#   4. path-traversal entries (".." in path) are filtered by the
+#      validator regex; only legitimate paths survive.
+#
+# Exit 0 on success, non-zero with diagnostic on first failure.
+# Run from the repo root (or via absolute path) — does not require
+# .mimir/ to exist in the repo.
+
+set -eu
+
+HERE="$(cd "$(dirname "$0")" && pwd)"
+COMPILE="$HERE/mimir-compile-metrics"
+[[ -x "$COMPILE" ]] || { echo "missing $COMPILE" >&2; exit 1; }
+
+TMP="$(mktemp -d -t mimir-smoke.XXXXXX)"
+trap 'rm -rf "$TMP"' EXIT
+mkdir -p "$TMP/.mimir/logs"
+
+fail() { echo "FAIL: $*" >&2; exit 1; }
+
+# --- 1. multi-event log -----------------------------------------------------
+LOG1="$TMP/.mimir/logs/20260430-120000-test001.jsonl"
+cat >"$LOG1" <<'EOF'
+{"ts":"2026-04-30T12:00:01Z","event":"knowledge.referenced","path":".mimir/knowledge/decisions/foo-bar.md","helpful":true}
+{"ts":"2026-04-30T12:00:02Z","event":"knowledge.referenced","path":".mimir/knowledge/decisions/foo-bar.md","helpful":false}
+{"ts":"2026-04-30T12:00:03Z","event":"wiki.referenced","path":".mimir/wiki/overview.md","helpful":true}
+{"ts":"2026-04-30T12:00:05Z","event":"gate.decision","decision":"save"}
+{"ts":"2026-04-30T12:00:06Z","event":"dedup.decision","action":"create"}
+{"ts":"2026-04-30T12:00:07Z","event":"knowledge.created","path":".mimir/knowledge/decisions/new-thing.md"}
+EOF
+OUT1=$("$COMPILE" "$LOG1")
+[[ -f "$OUT1" ]] || fail "multi-event: output file not produced"
+refs=$(jq -r '.knowledge_refs[".mimir/knowledge/decisions/foo-bar.md"].refs' "$OUT1")
+ht=$(jq -r '.knowledge_refs[".mimir/knowledge/decisions/foo-bar.md"].helpful_true' "$OUT1")
+hf=$(jq -r '.knowledge_refs[".mimir/knowledge/decisions/foo-bar.md"].helpful_false' "$OUT1")
+[[ "$refs" == "2" ]] || fail "multi-event: refs=2 expected, got $refs"
+[[ "$ht"   == "1" ]] || fail "multi-event: helpful_true=1 expected, got $ht"
+[[ "$hf"   == "1" ]] || fail "multi-event: helpful_false=1 expected, got $hf"
+
+# --- 2. idempotency ---------------------------------------------------------
+md5_a=$(md5 -q "$OUT1" 2>/dev/null || md5sum "$OUT1" | awk '{print $1}')
+"$COMPILE" "$LOG1" >/dev/null
+md5_b=$(md5 -q "$OUT1" 2>/dev/null || md5sum "$OUT1" | awk '{print $1}')
+[[ "$md5_a" == "$md5_b" ]] || fail "idempotency: hash changed ($md5_a -> $md5_b)"
+
+# --- 3. empty log -----------------------------------------------------------
+LOG2="$TMP/.mimir/logs/20260430-120100-empty.jsonl"
+: >"$LOG2"
+OUT2=$("$COMPILE" "$LOG2")
+[[ "$(jq -r '.compile_status' "$OUT2")" == "complete" ]] || fail "empty: compile_status != complete"
+[[ "$(jq -r '.started_at'     "$OUT2")" == "null"     ]] || fail "empty: started_at != null"
+[[ "$(jq    '.knowledge_refs' "$OUT2")" == "{}"       ]] || fail "empty: knowledge_refs != {}"
+
+# --- 4. path-traversal filter ----------------------------------------------
+LOG3="$TMP/.mimir/logs/20260430-120200-evil.jsonl"
+cat >"$LOG3" <<'EOF'
+{"ts":"2026-04-30T12:02:01Z","event":"knowledge.referenced","path":".mimir/knowledge/decisions/../../etc/passwd","helpful":true}
+{"ts":"2026-04-30T12:02:02Z","event":"knowledge.referenced","path":".mimir/knowledge/decisions/legit.md","helpful":true}
+EOF
+OUT3=$("$COMPILE" "$LOG3")
+n=$(jq -r '.knowledge_refs | length' "$OUT3")
+[[ "$n" == "1" ]] || fail "evil: 1 legit ref expected, got $n"
+[[ "$(jq -r '.knowledge_refs | keys[0]' "$OUT3")" == ".mimir/knowledge/decisions/legit.md" ]] || \
+  fail "evil: traversal path leaked into output"
+
+# --- 5. helpful-missing coerced to false + user_explicit counted -----------
+LOG4="$TMP/.mimir/logs/20260430-120300-coerce.jsonl"
+cat >"$LOG4" <<'EOF'
+{"ts":"2026-04-30T12:03:00Z","event":"knowledge.referenced","path":".mimir/knowledge/decisions/x.md"}
+{"ts":"2026-04-30T12:03:01Z","event":"knowledge.referenced","path":".mimir/knowledge/decisions/x.md","helpful":true}
+{"ts":"2026-04-30T12:03:02Z","event":"record.user_explicit","note":"u1"}
+{"ts":"2026-04-30T12:03:03Z","event":"record.user_explicit","note":"u2"}
+EOF
+OUT4=$("$COMPILE" "$LOG4")
+ht=$(jq -r '.knowledge_refs[".mimir/knowledge/decisions/x.md"].helpful_true'  "$OUT4")
+hf=$(jq -r '.knowledge_refs[".mimir/knowledge/decisions/x.md"].helpful_false' "$OUT4")
+ue=$(jq -r '.writes.user_explicit' "$OUT4")
+[[ "$ht" == "1" ]] || fail "coerce: helpful_true=1 expected, got $ht"
+[[ "$hf" == "1" ]] || fail "coerce: helpful_false=1 expected (missing→false), got $hf"
+[[ "$ue" == "2" ]] || fail "coerce: user_explicit=2 expected, got $ue"
+
+echo "OK: 5 smoke checks passed"
