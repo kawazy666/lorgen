@@ -1,30 +1,30 @@
 ---
 title: Architecture
 parent: overview
-summary: Pointers into Mimir's design rationale (docs/architecture.md is the canonical record).
+summary: Pointers into Lorgen's design rationale (docs/architecture.md is the canonical record).
 updated: 2026-04-29
 ---
 
 # Architecture
 
-The canonical, full-length record of Mimir's design decisions and the
+The canonical, full-length record of Lorgen's design decisions and the
 alternatives considered lives in [`docs/architecture.md`](../../docs/architecture.md).
 
-This Wiki page is a short pointer + index. For a Mimir-using codebase
+This Wiki page is a short pointer + index. For a Lorgen-using codebase
 **the architecture decisions belong in Knowledge `decisions/` and ADR
-files under `outputs.adr_dir`** (default `.mimir/adr/`), not here —
+files under `outputs.adr_dir`** (default `.lorgen/adr/`), not here —
 Wiki pages are summaries / indexes, not the source of truth.
 
 ## Key decisions (links into the canonical record)
 
 - **Claude Code plugin distribution, not Python CLI or standalone install** —
   see `docs/architecture.md` → "Why a Claude Code plugin"
-- **`agents/` + `skills/mimir/` at repo root, `.mimir/` for data only** —
-  see `docs/architecture.md` → "What Mimir is"
-- **In-repo `.mimir/`, not per-user global store** — see
-  `docs/architecture.md` → "Why `.mimir/` lives inside the user repo"
-- **Mimir never commits** — see `docs/architecture.md` → "Why no commits
-  from Mimir"
+- **`agents/` + `skills/lorgen/` at repo root, `.lorgen/` for data only** —
+  see `docs/architecture.md` → "What Lorgen is"
+- **In-repo `.lorgen/`, not per-user global store** — see
+  `docs/architecture.md` → "Why `.lorgen/` lives inside the user repo"
+- **Lorgen never commits** — see `docs/architecture.md` → "Why no commits
+  from Lorgen"
 - **ripgrep + LLM selection, not vector search** — see
   `docs/architecture.md` → "Why ripgrep + LLM selection, not vector search"
 - **Read = accumulate** — see `docs/architecture.md` → "Why 'read = accumulate'"

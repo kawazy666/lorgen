@@ -1,8 +1,8 @@
 # Accumulation — when and how to write Knowledge
 
 After gathering fresh sources for a question (per `sources.md`), decide
-what — if anything — to persist in `.mimir/knowledge/` or `.mimir/wiki/`.
-This is the "Mimir learns from every read" mechanism.
+what — if anything — to persist in `.lorgen/knowledge/` or `.lorgen/wiki/`.
+This is the "Lorgen learns from every read" mechanism.
 
 The pipeline has **four stages**:
 
@@ -11,7 +11,7 @@ The pipeline has **four stages**:
 3. **Dedup check** (ripgrep + LLM)
 4. **Update or create** (write the file, with slug validation)
 
-For `mimir record`-style explicit user requests:
+For `lorgen record`-style explicit user requests:
 
 - **Skip Stage 1 (filter)** — the user already classified the source
   as worth saving.
@@ -43,7 +43,7 @@ involvement**:
 | **Code comments** with markers `why:`, `because`, `HACK`, `workaround`, `FIXME` (with explanation) | **Maybe** | Often holds the only written rationale. Pass to Stage 2. |
 | Plain `TODO` with no context | **No** | Just a backlog item. |
 | **Issue body with discussion / decision** | **Maybe** | Pass to Stage 2. |
-| **User-explicit `mimir record`** | **Yes** — skip Stage 2 (gate); RUN Stages 3 and 4 | The user decided save, but dedup + slug validation still apply. |
+| **User-explicit `lorgen record`** | **Yes** — skip Stage 2 (gate); RUN Stages 3 and 4 | The user decided save, but dedup + slug validation still apply. |
 
 The filter is fast and binary. Reject early; never spend an LLM call on
 something the filter would drop.
@@ -71,8 +71,8 @@ Concrete heuristics for **drop**:
 - It is too generic to be actionable ("we should write better tests")
 - It is speculation without a follow-up commitment
 
-When borderline, **prefer to drop**. Mimir's value drops fast if it floods
-`.mimir/knowledge/` with low-signal noise. The user can always `mimir record`
+When borderline, **prefer to drop**. Lorgen's value drops fast if it floods
+`.lorgen/knowledge/` with low-signal noise. The user can always `lorgen record`
 later if they decide a dropped item was actually important.
 
 For each candidate that passes, draft:
@@ -88,7 +88,7 @@ covers the same ground**:
 
 ```bash
 # 3a. Pull keywords from the draft trigger and search.
-rg -i --no-heading --glob '.mimir/knowledge/**/*.md' \
+rg -i --no-heading --glob '.lorgen/knowledge/**/*.md' \
    -e '<keyword>' -e '<keyword>'
 
 # 3b. If you got hits, read the candidates fully and compare.
@@ -113,24 +113,24 @@ it splits attention and makes future retrieval ambiguous.
 
 ### Mandatory redaction pipe (REQUIRED before any Write)
 
-Every Knowledge / Wiki / ADR body Mimir is about to write **must** be
-piped through `mimir-redact` first. This proactively replaces known
+Every Knowledge / Wiki / ADR body Lorgen is about to write **must** be
+piped through `lorgen-redact` first. This proactively replaces known
 secret patterns (AWS / GitHub / Stripe / JWT / PEM / bearer / … —
 full set in the script) with `[REDACTED:<kind>]` markers, so the
-hook layer (`mimir-redact-check`, fired by the PreToolUse hook on
+hook layer (`lorgen-redact-check`, fired by the PreToolUse hook on
 `Write|Edit`) doesn't have to refuse the write and force a retry.
 
-The plugin manager adds the plugin's `bin/` to `PATH` when Mimir is
+The plugin manager adds the plugin's `bin/` to `PATH` when Lorgen is
 active, so call by **bare command name** — never bare relative path
-(`bin/mimir-redact` resolves against the user repo cwd and ENOENTs)
+(`bin/lorgen-redact` resolves against the user repo cwd and ENOENTs)
 and never `${CLAUDE_PLUGIN_ROOT}/bin/...` (that variable is exported
 into hook command strings only, not into subagent Bash):
 
 ```bash
-# Required pattern for any Write of synthesised Mimir content
-clean_body="$(printf '%s' "$body" | mimir-redact)"
+# Required pattern for any Write of synthesised Lorgen content
+clean_body="$(printf '%s' "$body" | lorgen-redact)"
 # Then call Write with $clean_body, e.g.:
-#   Write file_path=".mimir/knowledge/decisions/foo.md" content="$clean_body"
+#   Write file_path=".lorgen/knowledge/decisions/foo.md" content="$clean_body"
 ```
 
 The hook is the safety net (it blocks if the wrapper is bypassed or
@@ -144,25 +144,25 @@ For the rare case where a body legitimately needs to embed a string
 that matches a secret regex (e.g. an ADR documenting an example AWS
 key format), prefer rewriting to a *placeholder* (`AKIAEXAMPLEKEY...`)
 that does not match the strict pattern. As a last resort, the user
-can set `MIMIR_REDACT_BYPASS=1` in the shell where Claude Code was
+can set `LORGEN_REDACT_BYPASS=1` in the shell where Claude Code was
 launched — that env propagates into the PreToolUse hook process and
-disables `mimir-redact-check` until they unset it. **Inline `VAR=val
+disables `lorgen-redact-check` until they unset it. **Inline `VAR=val
 cmd` does not work for the hook** because the hook runs in a
 separate process spawned by Claude Code, not by the Bash tool call.
 
 ### Slug validation (REQUIRED before any Write)
 
-Before any `Write` to `.mimir/knowledge/<category>/<slug>.md`, validate
+Before any `Write` to `.lorgen/knowledge/<category>/<slug>.md`, validate
 the LLM-generated slug against the regex from `schema.md`. This is the
 **only line of defence against path traversal** when slugs come from
 attacker-controllable text (PR titles, issue bodies, user-record text).
 
 ```bash
-# Bash check Mimir runs before every Knowledge Write
-mimir_validate_slug() {
+# Bash check Lorgen runs before every Knowledge Write
+lorgen_validate_slug() {
   local slug="$1"
   if [[ ! "$slug" =~ ^[a-z0-9][a-z0-9-]{0,63}$ ]]; then
-    echo "🚫 Mimir refused: invalid slug \"$slug\"" >&2
+    echo "🚫 Lorgen refused: invalid slug \"$slug\"" >&2
     echo "   Must match ^[a-z0-9][a-z0-9-]{0,63}$ (no /, .., NUL, whitespace, non-ASCII)." >&2
     return 1
   fi
@@ -173,7 +173,7 @@ mimir_validate_slug() {
 slug="$(echo "$candidate_title" | iconv -t ASCII//TRANSLIT 2>/dev/null \
   | tr 'A-Z' 'a-z' | tr -c 'a-z0-9' '-' | sed 's/--*/-/g; s/^-//; s/-$//' \
   | cut -c1-64)"
-mimir_validate_slug "$slug" || exit 1
+lorgen_validate_slug "$slug" || exit 1
 ```
 
 If the slug fails validation, **do not write**. Surface the failure to
@@ -187,7 +187,7 @@ LLM-derived. This prevents `category=../../etc` style escape.
 
 ```python
 # pseudocode
-existing = read(".mimir/knowledge/conventions/decimal-money.md")
+existing = read(".lorgen/knowledge/conventions/decimal-money.md")
 existing.front_matter["sources"] += new_sources   # dedup by ref
 existing.front_matter["updated"] = today
 existing.body = merge_bodies(existing.body, new_paragraphs_to_add)
@@ -215,7 +215,7 @@ topic):
 After writing, **mention it in stdout briefly** — one line at the end of
 the answer:
 
-> `(saved: .mimir/knowledge/conventions/decimal-money.md)`
+> `(saved: .lorgen/knowledge/conventions/decimal-money.md)`
 
 This is the user-visible signal that knowledge accumulated.
 
@@ -235,29 +235,29 @@ Every accumulation pass emits log lines per `logging.md`:
 
 These are not optional — they are what `metrics.md`'s compile step
 turns into the per-session aggregate that the Roadmap improvement loop
-(`mimir consolidate`, hot promotion, stale detection) consumes.
+(`lorgen consolidate`, hot promotion, stale detection) consumes.
 
 ## Stage 5 (optional) — ADR mirror
 
 Most existing repos don't have an `adr/` directory at all. When the
 user wants discrete, immutable, industry-standard ADR files alongside
-Mimir's Knowledge items, Mimir writes them.
+Lorgen's Knowledge items, Lorgen writes them.
 
-**Default: off.** Mimir writes only `.mimir/knowledge/decisions/<slug>.md`.
+**Default: off.** Lorgen writes only `.lorgen/knowledge/decisions/<slug>.md`.
 
 **Opt in two ways**:
 
 1. **Per record**: user explicit — "ADR にして", "also write ADR",
-   `@mimir record --adr "..."`. Run only the ADR write for that one decision.
-2. **Project-level**: `.mimir/config.yaml` → `outputs.write_adr: true`. Every
-   `decision`-kind Knowledge item Mimir writes (or updates with new
+   `@lorgen record --adr "..."`. Run only the ADR write for that one decision.
+2. **Project-level**: `.lorgen/config.yaml` → `outputs.write_adr: true`. Every
+   `decision`-kind Knowledge item Lorgen writes (or updates with new
    substance) is mirrored to `<outputs.adr_dir>/`.
 
 ### Where
 
-`.mimir/adr/<NNNN>-<slug>.md` by default — keeps ADRs alongside the
-rest of Mimir's curated artefacts under `.mimir/`. Override via
-`.mimir/config.yaml` → `outputs.adr_dir` to a project-wide convention
+`.lorgen/adr/<NNNN>-<slug>.md` by default — keeps ADRs alongside the
+rest of Lorgen's curated artefacts under `.lorgen/`. Override via
+`.lorgen/config.yaml` → `outputs.adr_dir` to a project-wide convention
 like `docs/adr/` or `docs/decisions/` if you prefer.
 
 If the directory doesn't exist, **create it** and tell the user in
@@ -267,12 +267,12 @@ ADRs before.
 ### Numbering (robust against malicious filenames)
 
 ```bash
-mimir_next_adr_number() {
-  local adr_dir="$1"   # from outputs.adr_dir, default .mimir/adr
+lorgen_next_adr_number() {
+  local adr_dir="$1"   # from outputs.adr_dir, default .lorgen/adr
   local max=0
 
   # Use find with strict 4-digit pattern. Anything outside [0-9]{4}-*.md
-  # is ignored (so an attacker injecting .mimir/adr/9999-evil.md or
+  # is ignored (so an attacker injecting .lorgen/adr/9999-evil.md or
   # foo.md cannot poison numbering).
   while IFS= read -r f; do
     local base="${f##*/}"
@@ -293,13 +293,13 @@ mimir_next_adr_number() {
 }
 
 # Usage:
-NEXT="$(mimir_next_adr_number "$ADR_DIR")" || exit 1
+NEXT="$(lorgen_next_adr_number "$ADR_DIR")" || exit 1
 ADR_PATH="$ADR_DIR/${NEXT}-${slug}.md"
-mimir_validate_slug "$slug" || exit 1
+lorgen_validate_slug "$slug" || exit 1
 # ADR bodies go through the same redact pipe as Knowledge / Wiki
 # (Stage 4 "Mandatory redaction pipe"). The PreToolUse hook also
 # scopes to outputs.adr_dir, but the proactive wrapper is required.
-clean_adr_body="$(printf '%s' "$adr_body" | mimir-redact)"
+clean_adr_body="$(printf '%s' "$adr_body" | lorgen-redact)"
 # Then Write file_path="$ADR_PATH" content="$clean_adr_body"
 ```
 
@@ -347,13 +347,13 @@ What was decided? One paragraph, declarative.
 
 ## Cross-reference
 
-- Mimir Knowledge: [`.mimir/knowledge/decisions/<slug>.md`](../../.mimir/knowledge/decisions/<slug>.md)
+- Lorgen Knowledge: [`.lorgen/knowledge/decisions/<slug>.md`](../../.lorgen/knowledge/decisions/<slug>.md)
 - Sources cited above
 ```
 
 The ADR is **richer than the Knowledge body** — Knowledge is a few
 sentences for retrieval; ADR has full Context / Decision / Consequences
-for the human reader. Mimir derives the ADR's prose from the same source
+for the human reader. Lorgen derives the ADR's prose from the same source
 material that produced the Knowledge item, expanded into the standard
 sections.
 
@@ -377,10 +377,10 @@ When you write an ADR, also update the linked Knowledge item:
 
 - In the Knowledge file's `sources:` list, add
   `{type: adr, path: "<outputs.adr_dir>/NNNN-<slug>.md"}` (default
-  `.mimir/adr/NNNN-<slug>.md`).
+  `.lorgen/adr/NNNN-<slug>.md`).
 - Bump `updated:`.
 
-This makes the link bidirectional and lets Mimir retrieve from either side.
+This makes the link bidirectional and lets Lorgen retrieve from either side.
 
 ### What NOT to mirror as ADR
 
@@ -408,7 +408,7 @@ auth Wiki page:
 
 Don't regenerate the whole Wiki page from scratch on every Knowledge
 addition — incremental updates only. Full regeneration is for
-`mimir wiki refresh <area>` (see `onboard.md`).
+`lorgen wiki refresh <area>` (see `onboard.md`).
 
 ## Anti-patterns
 

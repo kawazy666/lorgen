@@ -1,0 +1,37 @@
+# Lorgen configuration. Tracked in git so the team shares it.
+# See .claude/skills/lorgen/schema.md for the full key reference.
+
+model: claude-opus-4-7
+effort: high
+max_tokens: 16000
+
+sources:
+  git: true
+  code_comments: true
+  github:
+    enabled: true
+    # repo: owner/name           # auto-detected from `git remote` if unset
+    pr_lookback_days: 30
+    pr_lookback_count: 50
+  adr_dirs:
+    - .lorgen/adr
+    - docs/adr
+    - docs/decisions
+  # notion:                      # roadmap, not yet wired
+  #   pages: []
+  #   databases: []
+
+outputs:
+  # Lorgen's canonical decision store is .lorgen/knowledge/decisions/.
+  # Set write_adr: true to ALSO mirror every decision as an industry-standard
+  # ADR file at outputs.adr_dir. Off by default; users can opt in per-record
+  # via "@lorgen record --adr ..." regardless of this setting.
+  write_adr: false
+  adr_dir: .lorgen/adr
+
+wiki:
+  repo_notes:
+    - "This repo IS Lorgen — it is a Claude Code plugin (subagent + skill + hooks + bin), not an application."
+    - "There is no production code. The plugin source lives at the repo root: .claude-plugin/plugin.json, agents/lorgen.md, skills/lorgen/*.md, hooks/hooks.json, bin/lorgen-*."
+    - "Users install via `/plugin install lorgen@<owner>/<repo>`; the plugin manager unpacks it under .claude/plugins/lorgen/ (project) or ~/.claude/plugins/lorgen/ (global) — never edit those installed paths directly."
+  pages: []

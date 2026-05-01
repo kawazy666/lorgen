@@ -1,6 +1,6 @@
-# Metrics — `.mimir/metrics/<session>.json` schema and compile contract
+# Metrics — `.lorgen/metrics/<session>.json` schema and compile contract
 
-Mimir compiles raw per-session logs into per-session aggregates. The
+Lorgen compiles raw per-session logs into per-session aggregates. The
 **raw logs are gitignored**; the **compiled metrics are tracked**. This
 is privacy-by-aggregation: paths, counts, and timestamps survive into
 git; query text, source bodies, and LLM summaries do not.
@@ -8,9 +8,9 @@ git; query text, source bodies, and LLM summaries do not.
 ## File layout
 
 ```
-.mimir/metrics/<YYYYMMDD>-<HHMMSS>-<invocation_id>.json
-                 # one file per Mimir invocation, paired 1:1 with
-                 # .mimir/logs/<same-stem>.jsonl
+.lorgen/metrics/<YYYYMMDD>-<HHMMSS>-<invocation_id>.json
+                 # one file per Lorgen invocation, paired 1:1 with
+                 # .lorgen/logs/<same-stem>.jsonl
 ```
 
 Per-session naming → merge-safe across contributors (no two metrics
@@ -27,7 +27,7 @@ files ever collide).
   "compile_status": "complete",
 
   "knowledge_refs": {
-    ".mimir/knowledge/conventions/decimal-money.md": {
+    ".lorgen/knowledge/conventions/decimal-money.md": {
       "refs": 3,
       "helpful_true": 2,
       "helpful_false": 1,
@@ -37,7 +37,7 @@ files ever collide).
   },
 
   "wiki_refs": {
-    ".mimir/wiki/architecture.md": {
+    ".lorgen/wiki/architecture.md": {
       "refs": 1,
       "helpful_true": 1,
       "helpful_false": 0,
@@ -81,9 +81,27 @@ files ever collide).
     "user_explicit":  0
   },
 
+  "review": {
+    "runs": 1,
+    "findings_total": 5,
+    "findings_by_severity": {
+      "critical": 1,
+      "warning":  2,
+      "info":     2
+    },
+    "outdated_signals": 1,
+    "lessons_added":    1,
+    "sources_added":    2
+  },
+
   "errors": 0
 }
 ```
+
+The `review` key is **omitted entirely** when no `review.*` event was
+logged in the session — keeps non-review sessions' metrics small and
+forward-compatible. Readers MUST treat a missing `review` key as
+"no reviews ran in this session", not as zeros.
 
 ### Field reference
 
@@ -95,12 +113,13 @@ files ever collide).
 | `compile_status` | enum | `complete` (log was fully processed and the invocation finished cleanly) or `partial` (compiled from a log that crashed mid-invocation — see "Orphan logs" below). |
 | `knowledge_refs` | map | Per-file aggregate. Key is the full path relative to repo root. Slug in the path **must match** `^[a-z0-9][a-z0-9-]{0,63}\.md$` — compile rejects files with malformed paths to prevent metrics-via-log poisoning. |
 | `*.helpful_true` / `*.helpful_false` | int | **Split, not summed.** Trigger health depends on `helpful_false / refs` ratio; a single `helpful_count` collapses the signal. `helpful_false` includes both explicit-false events AND events with `helpful` missing — the compile coerces missing to false (per `logging.md`) so the ratio degrades visibly when callers forget to emit the field. Invariant: `helpful_true + helpful_false == refs`. |
-| `wiki_refs` | map | Same shape as `knowledge_refs`, scoped to `.mimir/wiki/**/*.md`. |
-| `retrieved_but_unused` | int | Knowledge / Wiki files Mimir read while answering, but whose content did not appear in the final answer. Distinct from `helpful: false`, which is the per-file flag. The total is convenient. |
+| `wiki_refs` | map | Same shape as `knowledge_refs`, scoped to `.lorgen/wiki/**/*.md`. |
+| `retrieved_but_unused` | int | Knowledge / Wiki files Lorgen read while answering, but whose content did not appear in the final answer. Distinct from `helpful: false`, which is the per-file flag. The total is convenient. |
 | `gates` | map | Counts of `gate.decision` events by `decision`. |
 | `dedup` | map | Counts of `dedup.decision` events by `action`. |
 | `sources` | map | Counts of source items consulted, summed per type from `sources.gathered` events. |
 | `writes` | map | Counts of write events. `user_explicit` separately counts `record.user_explicit` events so cross-session tally of user-driven records survives raw-log gitignore. |
+| `review` | map (optional) | Aggregated from `review.*` events. **Omitted entirely** when the session ran no reviews. `runs` counts `review.completed` events. `findings_total` and `findings_by_severity.*` come from `review.comparator_finding` events. `outdated_signals` / `lessons_added` / `sources_added` come from `review.completed` event aggregates so cross-session trend analysis works without re-walking per-finding events. |
 | `errors` | int | Count of `error` events with `fatal: false`. Fatal errors mean the invocation crashed — see Orphan logs. |
 
 ### Path keys: validation contract
@@ -109,7 +128,7 @@ Every key under `knowledge_refs` and `wiki_refs` is a path. Compile
 **MUST** validate each key against:
 
 ```
-^\.mimir/(knowledge/(conventions|decisions|runbooks|facts|lessons)|wiki(/[a-z0-9][a-z0-9-]{0,63})*)/[a-z0-9][a-z0-9-]{0,63}\.md$
+^\.lorgen/(knowledge/(conventions|decisions|runbooks|facts|lessons)|wiki(/[a-z0-9][a-z0-9-]{0,63})*)/[a-z0-9][a-z0-9-]{0,63}\.md$
 ```
 
 If a key fails validation, compile drops that key (does NOT include it
@@ -120,13 +139,13 @@ This prevents poisoned slugs from ever reaching tracked files.
 
 ### When
 
-Mimir runs the compile at the **end of every invocation**, in the
+Lorgen runs the compile at the **end of every invocation**, in the
 SKILL.md operating loop. The skill instructs:
 
 > After answering and before returning, run the metrics compile step
 > on this invocation's log.
 
-If a compile fails (e.g. log file unreadable), Mimir reports the
+If a compile fails (e.g. log file unreadable), Lorgen reports the
 failure in stdout; the invocation still completes its primary work.
 
 ### Implementation: deterministic, jq-only
@@ -134,7 +153,7 @@ failure in stdout; the invocation still completes its primary work.
 Compile **MUST** be a pure transformation: log events in → metrics out.
 No LLM calls. No network.
 
-> **Canonical implementation lives in `bin/mimir-compile-metrics`.**
+> **Canonical implementation lives in `bin/lorgen-compile-metrics`.**
 > The bash + jq snippet below is **illustrative only** — read the
 > script for the authoritative behaviour (helpful-missing coercion,
 > sorted timestamp pick, `writes.user_explicit`, path-key
@@ -145,7 +164,7 @@ Sketch — what the script does end-to-end:
 
 ```bash
 #!/usr/bin/env bash
-# Authoritative source: bin/mimir-compile-metrics.
+# Authoritative source: bin/lorgen-compile-metrics.
 # This sketch omits: validation regex anchoring, timestamp sorting
 # for started_at/ended_at, helpful-missing coercion, user_explicit
 # count, atomic temp-file rename. Refer to the script.
@@ -166,7 +185,7 @@ jq -n --slurpfile evs "$LOG" --arg session "$SESSION" '
             helpful_false: map(select(.helpful != true)) | length
           }
       }) | from_entries),
-      # ... full shape and event handlers in bin/mimir-compile-metrics
+      # ... full shape and event handlers in bin/lorgen-compile-metrics
     }
 '
 ```
@@ -184,8 +203,8 @@ metrics file):
 
 ```bash
 jq -c '
-  .knowledge_refs |= with_entries(select(.key | test("^\\.mimir/knowledge/(conventions|decisions|runbooks|facts|lessons)/[a-z0-9][a-z0-9-]{0,63}\\.md$")))
-  | .wiki_refs    |= with_entries(select(.key | test("^\\.mimir/wiki(/[a-z0-9][a-z0-9-]{0,63})*/[a-z0-9][a-z0-9-]{0,63}\\.md$")))
+  .knowledge_refs |= with_entries(select(.key | test("^\\.lorgen/knowledge/(conventions|decisions|runbooks|facts|lessons)/[a-z0-9][a-z0-9-]{0,63}\\.md$")))
+  | .wiki_refs    |= with_entries(select(.key | test("^\\.lorgen/wiki(/[a-z0-9][a-z0-9-]{0,63})*/[a-z0-9][a-z0-9-]{0,63}\\.md$")))
 '
 ```
 
@@ -199,20 +218,20 @@ re-compile)."
 
 ### Orphan logs (crashed invocations)
 
-A crashed invocation leaves `.mimir/logs/<X>.jsonl` without a matching
-`.mimir/metrics/<X>.json`. The next Mimir invocation runs an
+A crashed invocation leaves `.lorgen/logs/<X>.jsonl` without a matching
+`.lorgen/metrics/<X>.json`. The next Lorgen invocation runs an
 **orphan-log sweep** at startup (after generating its own session id):
 
 ```bash
-# `mimir-compile-metrics` is on PATH because the plugin's bin/ is
-# auto-prepended when Mimir is active. Do NOT use bin/mimir-... or
+# `lorgen-compile-metrics` is on PATH because the plugin's bin/ is
+# auto-prepended when Lorgen is active. Do NOT use bin/lorgen-... or
 # ${CLAUDE_PLUGIN_ROOT}/bin/... here — neither resolves correctly
 # from a subagent Bash call (cwd is the user repo).
-mkdir -p .mimir/metrics
-for log in .mimir/logs/*.jsonl; do
-  metric=".mimir/metrics/$(basename "$log" .jsonl).json"
+mkdir -p .lorgen/metrics
+for log in .lorgen/logs/*.jsonl; do
+  metric=".lorgen/metrics/$(basename "$log" .jsonl).json"
   if [[ ! -f "$metric" ]]; then
-    mimir-compile-metrics "$log"  # writes $metric atomically; idempotent
+    lorgen-compile-metrics "$log"  # writes $metric atomically; idempotent
   fi
 done
 ```
@@ -233,22 +252,22 @@ Bumping `schema_version` is allowed but every change MUST:
 1. Add or rename fields, never repurpose existing ones.
 2. Update this file's "Schema" section with a clear `## v2` heading.
 3. Make the compile script emit the new shape.
-4. Document a `mimir consolidate --re-aggregate` recipe to recompute
+4. Document a `lorgen consolidate --re-aggregate` recipe to recompute
    any cross-session aggregates that depend on changed fields.
 
-Readers (Roadmap `mimir consolidate`, hot/stale detectors) MUST guard
+Readers (Roadmap `lorgen consolidate`, hot/stale detectors) MUST guard
 on `schema_version` and skip files with versions they don't understand.
 
 ### Regression test surface
 
-`bin/mimir-compile-metrics-smoke` is the canonical regression test
+`bin/lorgen-compile-metrics-smoke` is the canonical regression test
 for the compile contract. It builds JSONL fixtures in a tmpdir and
 asserts: multi-event populates `knowledge_refs` / `wiki_refs` with
 correct `helpful_true` / `helpful_false` split, idempotency
 (byte-identical hash on re-run), empty log → valid empty schema,
 path-traversal entries dropped, missing-`helpful` coerced to false,
 and `record.user_explicit` count emitted into `writes.user_explicit`.
-**Run it after any change to `bin/mimir-compile-metrics`** —
+**Run it after any change to `bin/lorgen-compile-metrics`** —
 expected output: `OK: 5 smoke checks passed`.
 
 ## Reading metrics — recipes
@@ -263,7 +282,7 @@ jq -s '
   | group_by(.key)
   | map({path: .[0].key, refs: ([.[].value.refs] | add), helpful_ratio: ([.[].value.helpful_true] | add) / ([.[].value.refs] | add)})
   | sort_by(-.refs) | .[:20]
-' .mimir/metrics/*.json
+' .lorgen/metrics/*.json
 
 # Stale Knowledge — last_ts older than 90 days, refs > 0
 jq -s --argjson cutoff $(date -u -v-90d +%s 2>/dev/null || date -u --date='-90 days' +%s) '
@@ -271,7 +290,7 @@ jq -s --argjson cutoff $(date -u -v-90d +%s 2>/dev/null || date -u --date='-90 d
   | group_by(.key)
   | map({path: .[0].key, last_ts: ([.[].value.last_ts] | max), refs: ([.[].value.refs] | add)})
   | map(select(.refs > 0 and ((.last_ts | fromdateiso8601) < $cutoff)))
-' .mimir/metrics/*.json
+' .lorgen/metrics/*.json
 
 # Trigger health — high-read, low-helpful Knowledge (candidates for trigger refinement)
 jq -s '
@@ -284,17 +303,17 @@ jq -s '
     })
   | map(select(.refs >= 5 and .helpful_ratio < 0.5))
   | sort_by(.helpful_ratio)
-' .mimir/metrics/*.json
+' .lorgen/metrics/*.json
 
 # Unread Knowledge — items on disk that were never referenced in any
 # tracked metrics file. The recipes above are blind to refs==0 because
 # `knowledge_refs` only contains files that were actually read; this
 # diff is the matching "stale because never touched" surface.
 comm -23 \
-  <(find .mimir/knowledge -type f -name '*.md' | sort -u) \
+  <(find .lorgen/knowledge -type f -name '*.md' | sort -u) \
   <(jq -r 'select(.schema_version==1) | .knowledge_refs | keys[]' \
-       .mimir/metrics/*.json 2>/dev/null | sort -u)
+       .lorgen/metrics/*.json 2>/dev/null | sort -u)
 ```
 
 These recipes are the MVP trigger-health / stale-detection surface.
-The Roadmap `mimir consolidate` formalises them into an interactive tool.
+The Roadmap `lorgen consolidate` formalises them into an interactive tool.

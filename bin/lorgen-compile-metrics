@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
-# bin/mimir-compile-metrics  <log-file>
+# bin/lorgen-compile-metrics  <log-file>
 #
-# Reads .mimir/logs/<session>.jsonl and writes
-# .mimir/metrics/<same-stem>.json. Pure jq transformation: no LLM,
+# Reads .lorgen/logs/<session>.jsonl and writes
+# .lorgen/metrics/<same-stem>.json. Pure jq transformation: no LLM,
 # no network, no shell expansion of log values. Reference impl of
-# the contract in skills/mimir/metrics.md.
+# the contract in skills/lorgen/metrics.md.
 #
 # Idempotent: re-running on the same log produces byte-identical
 # output. Safe to call from the orphan-log sweep at session start.
 #
 # Usage:
-#   mimir-compile-metrics .mimir/logs/20260429-102345-a3f9c2.jsonl
-#   → writes .mimir/metrics/20260429-102345-a3f9c2.json
+#   lorgen-compile-metrics .lorgen/logs/20260429-102345-a3f9c2.jsonl
+#   → writes .lorgen/metrics/20260429-102345-a3f9c2.json
 #   → also prints the path to stdout on success.
 
 set -eu
@@ -36,8 +36,8 @@ if [[ ! "$LOG_BASENAME" =~ ^[0-9]{8}-[0-9]{6}-[A-Za-z0-9_-]+$ ]]; then
   exit 65
 fi
 
-LOG_DIR="$(dirname "$LOG")"                 # .mimir/logs
-ROOT="$(dirname "$LOG_DIR")"                # .mimir
+LOG_DIR="$(dirname "$LOG")"                 # .lorgen/logs
+ROOT="$(dirname "$LOG_DIR")"                # .lorgen
 METRICS_DIR="$ROOT/metrics"
 mkdir -p "$METRICS_DIR"
 OUT="$METRICS_DIR/${LOG_BASENAME}.json"
@@ -48,8 +48,8 @@ TMP="${OUT}.tmp.$$"
 # Single-quoted bash strings keep backslashes literal: `\.` is sent
 # to jq as two characters (\, .), which jq parses as a regex
 # escape for a literal dot.
-KNOWLEDGE_RE='^\.mimir/knowledge/(conventions|decisions|runbooks|facts|lessons)/[a-z0-9][a-z0-9-]{0,63}\.md$'
-WIKI_RE='^\.mimir/wiki(/[a-z0-9][a-z0-9-]{0,63})*/[a-z0-9][a-z0-9-]{0,63}\.md$'
+KNOWLEDGE_RE='^\.lorgen/knowledge/(conventions|decisions|runbooks|facts|lessons)/[a-z0-9][a-z0-9-]{0,63}\.md$'
+WIKI_RE='^\.lorgen/wiki(/[a-z0-9][a-z0-9-]{0,63})*/[a-z0-9][a-z0-9-]{0,63}\.md$'
 
 # --slurpfile reads each JSON value (one per line in JSONL) and binds
 # an array to $evs. So $evs IS the events array — do not index $evs[0].
@@ -155,8 +155,8 @@ jq -n \
         adr_created:       ($events | map(select(.event=="adr.created"))       | length),
         adr_superseded:    ($events | map(select(.event=="adr.superseded"))    | length),
         # Track explicit-record provenance separately from inferred
-        # writes — accumulation pipeline distinguishes "Mimir judged
-        # worth saving" from "user told Mimir to save". Cross-session
+        # writes — accumulation pipeline distinguishes "Lorgen judged
+        # worth saving" from "user told Lorgen to save". Cross-session
         # tally of user-explicit records is otherwise unrecoverable
         # once raw logs are gitignored.
         user_explicit:     ($events | map(select(.event=="record.user_explicit")) | length)
@@ -166,6 +166,53 @@ jq -n \
         $events | map(select(.event=="error" and (.fatal // false) == false)) | length
       )
     }
+    # Review section — only emit when the session actually ran reviews.
+    # Detection: presence of any review.* event. We test against
+    # review.completed first (the closure event) and fall back to
+    # comparator_finding so a crashed-mid-review session still surfaces
+    # partial findings.
+    #
+    # SECURITY INVARIANT: review.* fields with free-text content
+    # (rule_id, rule_source, location, candidate, etc.) MUST NOT be
+    # emitted into the compiled metrics. The metrics file is tracked
+    # in git; a successfully prompt-injected sub-agent could otherwise
+    # write attacker-chosen text into a tracked artefact. Counts only.
+    # Any future "include top rule_source by frequency" feature MUST
+    # add path-key validation matching $krx / $wrx above.
+    | . as $base
+    | (
+        ($events | map(select(.event | startswith("review.")))) as $rev
+        | if ($rev | length) > 0 then
+            $base + {
+              review: {
+                runs: ($events | map(select(.event=="review.completed")) | length),
+                findings_total: (
+                  $events | map(select(.event=="review.comparator_finding")) | length
+                ),
+                findings_by_severity: {
+                  critical: ($events | map(select(.event=="review.comparator_finding" and .severity=="critical")) | length),
+                  warning:  ($events | map(select(.event=="review.comparator_finding" and .severity=="warning"))  | length),
+                  info:     ($events | map(select(.event=="review.comparator_finding" and .severity=="info"))     | length)
+                },
+                # outdated_signals / lessons_added / sources_added come from
+                # the closure event aggregates. Sum across multiple
+                # review.completed events in case the session ran
+                # multiple reviews (unusual but supported).
+                outdated_signals: (
+                  $events | map(select(.event=="review.completed") | (.outdated_signals // 0)) | add // 0
+                ),
+                lessons_added: (
+                  $events | map(select(.event=="review.completed") | (.lessons_added // 0))   | add // 0
+                ),
+                sources_added: (
+                  $events | map(select(.event=="review.completed") | (.sources_added // 0))   | add // 0
+                )
+              }
+            }
+          else
+            $base
+          end
+      )
   ' >"$TMP"
 
 mv "$TMP" "$OUT"

@@ -1,12 +1,12 @@
 # Onboard — initial repo scan and backfill
 
-The user can ask Mimir to "onboard" a repo, which is a heavy first-pass
+The user can ask Lorgen to "onboard" a repo, which is a heavy first-pass
 scan that produces the initial Knowledge and Wiki set. This is meant to
 be run once per repo (and re-run after a long absence or when significant
 history is missed).
 
-There is no separate `mimir onboard` shell command — the user simply asks
-the `mimir` agent to "onboard this repo" or "scan the last year". You
+There is no separate `lorgen onboard` shell command — the user simply asks
+the `lorgen` agent to "onboard this repo" or "scan the last year". You
 detect that intent and run this procedure.
 
 ## Default behaviour
@@ -47,7 +47,7 @@ For each chunk:
 3. For each PR, run the **same accumulation pipeline** as `accumulation.md`:
    filter (Stage 1) → worth-saving gate (Stage 2) → dedup (Stage 3) →
    write (Stage 4).
-4. Update `.mimir/state.json`:
+4. Update `.lorgen/state.json`:
    ```json
    {
      "onboard": {
@@ -63,10 +63,10 @@ For each chunk:
 ### Resume
 
 When the user re-invokes onboard with `--resume`-equivalent, read
-`.mimir/state.json`:
+`.lorgen/state.json`:
 
 ```python
-state = json.load(open(".mimir/state.json"))
+state = json.load(open(".lorgen/state.json"))
 resume_from = state["onboard"]["last_completed_until"]
 # Continue from resume_from
 ```
@@ -82,7 +82,7 @@ For each chunk, after completion, emit:
 - The accumulation pipeline's normal events (`gate.decision`,
   `dedup.decision`, `knowledge.created` etc.) for each PR processed.
 
-Logs accumulate in `.mimir/logs/<YYYYMMDD>.jsonl` as the run progresses,
+Logs accumulate in `.lorgen/logs/<YYYYMMDD>.jsonl` as the run progresses,
 so a Ctrl-C mid-chunk leaves a partial but readable audit trail.
 
 ### Progress reporting
@@ -95,24 +95,24 @@ Chunk 2026-03: 18 PRs scanned, 6 Knowledge items added, 2 updated.
 ...
 ```
 
-Detail (which Knowledge files, which PRs) goes to `.mimir/logs/`.
+Detail (which Knowledge files, which PRs) goes to `.lorgen/logs/`.
 
 ## What gets generated on a fresh `onboard`
 
 Always:
 
-1. **`.mimir/wiki/overview.md`** — top-level summary derived from README,
+1. **`.lorgen/wiki/overview.md`** — top-level summary derived from README,
    `pyproject.toml` / `package.json` / `Cargo.toml` / etc., and the
    directory layout. One section: "what this repo is", "main components",
    "entry points".
 
-2. **`.mimir/wiki/modules/<name>.md`** — one shallow page per top-level
+2. **`.lorgen/wiki/modules/<name>.md`** — one shallow page per top-level
    module / directory under `src/` (or the project's equivalent). Each
    page: purpose, main files, key types/functions, links to relevant
    Knowledge.
 
 3. **Knowledge from convention files** — read these and convert each into
-   `.mimir/knowledge/conventions/<slug>.md` if not already present:
+   `.lorgen/knowledge/conventions/<slug>.md` if not already present:
    - `CLAUDE.md`
    - `AGENTS.md`
    - `.cursorrules`, `.windsurfrules`
@@ -120,7 +120,7 @@ Always:
    - `README.md` (sections like "design principles", "trade-offs")
 
 4. **Knowledge from existing ADRs** — for each ADR file under
-   `sources.adr_dirs` (default `.mimir/adr/`, `docs/adr/`,
+   `sources.adr_dirs` (default `.lorgen/adr/`, `docs/adr/`,
    `docs/decisions/`), create a `decision`-kind Knowledge item with
    `sources: [{type: adr, path: ...}]`. Skip if already covered.
 
@@ -132,14 +132,14 @@ Always:
 
 Optional (off by default — opt-in via `wiki.pages` in config):
 
-7. **Steered Wiki pages** — if `.mimir/config.yaml` → `wiki.pages` lists
+7. **Steered Wiki pages** — if `.lorgen/config.yaml` → `wiki.pages` lists
    specific pages, generate exactly those.
 
-8. **ADR scaffolding** — if `.mimir/config.yaml` → `outputs.write_adr: true`,
+8. **ADR scaffolding** — if `.lorgen/config.yaml` → `outputs.write_adr: true`,
    any new `decision`-kind Knowledge produced by onboard is mirrored
-   into `<outputs.adr_dir>/NNNN-<slug>.md` (default `.mimir/adr/`) per
+   into `<outputs.adr_dir>/NNNN-<slug>.md` (default `.lorgen/adr/`) per
    `accumulation.md` → "Stage 5". If the directory doesn't exist yet,
-   create it. When `outputs.adr_dir` points outside `.mimir/` (e.g.
+   create it. When `outputs.adr_dir` points outside `.lorgen/` (e.g.
    `docs/adr/`), inform the user — adding a top-level `adr/` directory
    to a repo that didn't have one is a meaningful structural change
    worth surfacing.
@@ -154,7 +154,7 @@ For a fast onboard (`--quick` or just "do a light scan"):
   network, fast.
 
 This is the right default when the user just wants to see the
-directory layout and convention files normalised into `.mimir/`.
+directory layout and convention files normalised into `.lorgen/`.
 
 ## After onboard
 
@@ -167,18 +167,18 @@ Onboard complete.
 - Knowledge skipped (already present or not worth saving): 8
 - PRs scanned: 47
 
-Review with: git status / git diff .mimir/
+Review with: git status / git diff .lorgen/
 Commit when ready.
 ```
 
 The summary is for stdout. Detailed per-event records are already in
-`.mimir/logs/` from the chunk loop above; do not re-log the summary.
+`.lorgen/logs/` from the chunk loop above; do not re-log the summary.
 
 ## Things `onboard` does NOT do
 
 - Does not commit. The user does that.
 - Does not modify the user's source code (no comment additions, no
-  rewrites). The `.mimir/` directory is the only write target.
+  rewrites). The `.lorgen/` directory is the only write target.
 - Does not delete previously-generated Knowledge or Wiki content. If you
   detect that an existing file is now redundant or wrong, surface the
   observation in the summary; let the user decide.

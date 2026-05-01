@@ -5,7 +5,7 @@ gather material from the underlying sources. Five collectors, listed in
 roughly increasing cost / depth:
 
 1. **Code comments** (cheap, often surprisingly informative)
-2. **Local ADR files** (`.mimir/adr/`, `docs/adr/`, `docs/decisions/`) (cheap, high signal)
+2. **Local ADR files** (`.lorgen/adr/`, `docs/adr/`, `docs/decisions/`) (cheap, high signal)
 3. **Git log** (cheap, structural)
 4. **Git blame** (targeted, useful when the question is about a specific
    line / function)
@@ -22,7 +22,7 @@ question is about a specific decision in code.
 ```bash
 # Markers we treat as intent-rich (they almost always carry "why")
 rg -i --no-heading --line-number \
-   --glob '!.mimir/' --glob '!node_modules/' --glob '!.venv/' \
+   --glob '!.lorgen/' --glob '!node_modules/' --glob '!.venv/' \
    -e '\bwhy:' -e '\bbecause\b' -e '\bworkaround\b' \
    -e '\bHACK\b' -e '\bFIXME\b' -e '\bXXX\b'
 
@@ -43,15 +43,15 @@ When citing, use `(src/auth/session.py:42)` in the answer.
 
 ## 2. ADR / decisions folder
 
-Default scan paths (override via `.mimir/config.yaml` → `sources.adr_dirs`):
+Default scan paths (override via `.lorgen/config.yaml` → `sources.adr_dirs`):
 
 ```bash
-ls .mimir/adr/ docs/adr/ docs/decisions/ doc/adr/ adr/ 2>/dev/null
+ls .lorgen/adr/ docs/adr/ docs/decisions/ doc/adr/ adr/ 2>/dev/null
 ```
 
 Each `*.md` is high-signal — these files exist *because* someone decided
 to write down a "why". Read fully, cite by relative path:
-`(.mimir/adr/0003-decimal-money.md)` or `(docs/adr/0003-decimal-money.md)`
+`(.lorgen/adr/0003-decimal-money.md)` or `(docs/adr/0003-decimal-money.md)`
 depending on where the repo keeps them.
 
 ## 3. Git log
@@ -143,17 +143,17 @@ discussion. Cite as `(issue #37)`.
 ### Cache PR / issue fetches
 
 The `gh` calls are network-bound and slow. Cache results into
-`.mimir/cache/sources/`:
+`.lorgen/cache/sources/`:
 
 ```
-.mimir/cache/sources/pr/42.json      # raw `gh pr view --json` output
-.mimir/cache/sources/issue/37.json
+.lorgen/cache/sources/pr/42.json      # raw `gh pr view --json` output
+.lorgen/cache/sources/issue/37.json
 ```
 
 Before fetching, check the cache:
 
 ```bash
-test -f .mimir/cache/sources/pr/42.json && cat .mimir/cache/sources/pr/42.json
+test -f .lorgen/cache/sources/pr/42.json && cat .lorgen/cache/sources/pr/42.json
 ```
 
 The cache is gitignored (per `schema.md`). Stale entries are fine for
@@ -162,7 +162,7 @@ open PRs, refetch.
 
 ### Repo slug detection
 
-If `.mimir/config.yaml` doesn't pin `sources.github.repo`, derive it from
+If `.lorgen/config.yaml` doesn't pin `sources.github.repo`, derive it from
 git:
 
 ```bash

@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/bin/mimir-pretool-guard"
+            "command": "${CLAUDE_PLUGIN_ROOT}/bin/lorgen-pretool-guard"
           }
         ]
       }

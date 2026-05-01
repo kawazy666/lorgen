@@ -1,6 +1,6 @@
 {
-  "name": "mimir",
-  "description": "Repository knowledge curator. Captures the 'why' behind code — design decisions, history, trade-offs — that source alone cannot tell. Stores everything as Markdown under .mimir/ so humans and AI agents both read and grow the same knowledge base.",
+  "name": "lorgen",
+  "description": "Repository knowledge curator named after Lordgenome — the biological supercomputer in Tengen Toppa Gurren Lagann. Captures the 'why' behind code — design decisions, history, trade-offs — that source alone cannot tell. Stores everything as Markdown under .lorgen/ so humans and AI agents both read and grow the same knowledge base. Also runs Knowledge-grounded multi-agent code review via /lorgen:review.",
   "version": "0.1.0",
   "author": {
     "name": "renton"

@@ -1,7 +1,7 @@
 # Retrieval — looking up existing Knowledge
 
-When the user asks Mimir a "why" / "history" / "convention" question, the first
-move is to check whether the answer already lives in `.mimir/knowledge/`.
+When the user asks Lorgen a "why" / "history" / "convention" question, the first
+move is to check whether the answer already lives in `.lorgen/knowledge/`.
 Only if it doesn't, fall through to fresh source-gathering (`sources.md`).
 
 The retrieval method is **ripgrep + LLM selection**, *not* vector search.
@@ -16,7 +16,7 @@ Build a query from the user's question — extract the most distinctive keywords
 
 ```bash
 rg --no-heading --line-number \
-   --glob '.mimir/knowledge/**/*.md' \
+   --glob '.lorgen/knowledge/**/*.md' \
    --max-count 3 \
    -e '<keyword1>' -e '<keyword2>' -e '<keyword3>'
 ```
@@ -24,7 +24,7 @@ rg --no-heading --line-number \
 For a question like "なぜ Decimal を使うのか?", run:
 
 ```bash
-rg -i --no-heading --line-number --glob '.mimir/knowledge/**/*.md' \
+rg -i --no-heading --line-number --glob '.lorgen/knowledge/**/*.md' \
    -e 'Decimal' -e 'money' -e '通貨'
 ```
 
@@ -33,10 +33,10 @@ Tactics:
 - Run case-insensitive (`-i`) by default.
 - Search **trigger lines first** with a tighter pattern, then expand to body
   if no hits:
-  `rg -i --glob '.mimir/knowledge/**/*.md' '^trigger:.*Decimal'`
+  `rg -i --glob '.lorgen/knowledge/**/*.md' '^trigger:.*Decimal'`
 - Cap hits with `--max-count 3` per file — you don't need every line, just
   enough to identify the candidate file.
-- Don't grep the whole repo. Scope to `.mimir/knowledge/`.
+- Don't grep the whole repo. Scope to `.lorgen/knowledge/`.
 
 **When you read a candidate fully** (Step 2), emit a
 `knowledge.referenced` (or `wiki.referenced`) log line per
@@ -67,7 +67,7 @@ Either:
 
 - Narrow the keywords and re-run, or
 - Read just the `trigger:` and `tags:` lines of each candidate first
-  (`rg -A2 '^trigger:' .mimir/knowledge/...`) and pick the top 3 to read fully.
+  (`rg -A2 '^trigger:' .lorgen/knowledge/...`) and pick the top 3 to read fully.
 
 ## Step 3 — Decide if Knowledge answers the question
 
@@ -94,7 +94,7 @@ monetary 値は `decimal.Decimal` 必須。
 以後 `src/billing/` 配下は Decimal、test では `Decimal('1.00') == Decimal('1.0')`
 で比較する。
 
-(.mimir/knowledge/conventions/decimal-money.md)
+(.lorgen/knowledge/conventions/decimal-money.md)
 ```
 
 **Do NOT trigger accumulation** in this path — there's no new information
@@ -118,9 +118,9 @@ Wiki pages are coarser than Knowledge items, but for **broad questions**
 (e.g. "auth モジュール全体について教えて") Wiki is the right entry point:
 
 ```bash
-rg -i --no-heading --line-number --glob '.mimir/wiki/**/*.md' \
+rg -i --no-heading --line-number --glob '.lorgen/wiki/**/*.md' \
    -e 'auth'
-ls .mimir/wiki/modules/  # quick overview
+ls .lorgen/wiki/modules/  # quick overview
 ```
 
 Read the matching Wiki page first; it likely points to several Knowledge
@@ -131,7 +131,7 @@ items via internal links. Follow them.
 If ripgrep returns nothing and source-gathering also turns up nothing
 substantive, **say so explicitly**:
 
-> ".mimir/knowledge/ を検索したが Decimal に関する記録なし。
+> ".lorgen/knowledge/ を検索したが Decimal に関する記録なし。
 > git log と PR も確認したが、float→Decimal 移行は履歴に明示なし。
 > `src/billing/` の現在のコードは Decimal を使っているが、移行の経緯
 > は記録されていない。recordしますか?"

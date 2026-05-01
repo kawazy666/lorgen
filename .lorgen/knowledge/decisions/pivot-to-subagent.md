@@ -12,7 +12,7 @@ sources:
 
 ## What
 
-Mimir was originally implemented as a standalone Python CLI calling the
+Lorgen was originally implemented as a standalone Python CLI calling the
 Anthropic API directly. We replaced that with a Claude Code subagent
 plus a multi-file skill (later packaged as a plugin — see
 `package-as-plugin.md` for the next step).
@@ -22,7 +22,7 @@ plus a multi-file skill (later packaged as a plugin — see
 Three forces drove the pivot:
 
 1. **Cost duplication** — every CLI invocation made the calling agent
-   (Claude Code) pay for one LLM round-trip and Mimir itself pay for
+   (Claude Code) pay for one LLM round-trip and Lorgen itself pay for
    another with a second API key. The subagent runs inside the caller's
    session, single LLM, single cost.
 2. **Setup friction** — Python CLI required `pip install`,
@@ -36,22 +36,22 @@ Three forces drove the pivot:
 
 Subagent form is **Claude Code only**. Cursor / aider / CI / cron
 callers cannot use it. We accept this for MVP because the primary user
-is Claude Code, and a Python CLI on the same `.mimir/` data model can
+is Claude Code, and a Python CLI on the same `.lorgen/` data model can
 be added later as a Roadmap item without changing any Knowledge file.
 
 ## What it ruled out
 
-- Vector / RAG-based retrieval — Mimir leans on `ripgrep + LLM
+- Vector / RAG-based retrieval — Lorgen leans on `ripgrep + LLM
   selection` over the structured Knowledge files, matching the
   Cursor / Claude Code / Devin approach.
-- A separate Mimir daemon — the subagent is single-shot per
+- A separate Lorgen daemon — the subagent is single-shot per
   invocation; "always-loaded state" is achieved by the skill loading
-  `.mimir/` on demand.
+  `.lorgen/` on demand.
 
 ## Where to read more
 
 - `docs/architecture.md` — long-form record of every alternative
   considered.
-- `.mimir/wiki/architecture.md` — pointer index.
+- `.lorgen/wiki/architecture.md` — pointer index.
 - [decision: package as plugin](package-as-plugin.md) — the follow-up
   pivot from "subagent + standalone install.sh" to "Claude Code plugin".

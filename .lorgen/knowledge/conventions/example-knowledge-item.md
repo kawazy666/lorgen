@@ -17,19 +17,19 @@ items in a user's repo would replace files like this.
 ## Anatomy
 
 The front-matter at the top of this file is structured per
-`.claude/skills/mimir/schema.md`:
+`.claude/skills/lorgen/schema.md`:
 
-- `trigger:` — the keywords/phrases Mimir will match against to decide whether
+- `trigger:` — the keywords/phrases Lorgen will match against to decide whether
   this item is relevant to a given user question. Make it specific.
 - `kind:` — one of `convention`, `decision`, `runbook`, `fact`, `lesson`.
-  Determines the default folder under `.mimir/knowledge/`.
+  Determines the default folder under `.lorgen/knowledge/`.
 - `scope:` — `repo` (default) or `global`.
 - `tags:` — optional free-form labels.
 - `sources:` — required. Each source has a `type` and at least one of
   `ref`, `path`, or `url`. Examples:
   - `{type: pr, ref: "#42", url: "..."}`
   - `{type: commit, ref: "abc1234"}`
-  - `{type: adr, path: ".mimir/adr/0003-decimal.md"}`
+  - `{type: adr, path: ".lorgen/adr/0003-decimal.md"}`
   - `{type: code, path: "src/auth/session.py", line: 42}`
   - `{type: user-record, ref: "initial scaffold"}`
 - `created:` and `updated:` — ISO dates.
@@ -38,7 +38,7 @@ The front-matter at the top of this file is structured per
 
 The body is just Markdown. Keep it tight — a few sentences to a couple of
 paragraphs. If you want to write more, it probably belongs in a Wiki page
-(`.mimir/wiki/`) instead.
+(`.lorgen/wiki/`) instead.
 
 ## When to delete this file
 

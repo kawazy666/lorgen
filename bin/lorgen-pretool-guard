@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# bin/mimir-pretool-guard
+# bin/lorgen-pretool-guard
 #
 # Wired as Claude Code's PreToolUse hook for Write|Edit (see hooks/hooks.json).
 # Reads the hook input JSON on stdin, decides whether the tool call is
-# subject to Mimir's redaction guard, and if so, scans the to-be-written
-# content via mimir-redact-check.
+# subject to Lorgen's redaction guard, and if so, scans the to-be-written
+# content via lorgen-redact-check.
 #
 # Hook contract (Anthropic):
 # - Receives JSON on stdin describing the pending tool call.
@@ -13,11 +13,11 @@
 #   surfaced to the model.
 #
 # Scope: glob-negation form.
-#   IN scope:    .mimir/**/*  except  .mimir/logs/**, .mimir/cache/**
-#                <outputs.adr_dir>/**  (default .mimir/adr/, already
-#                                       covered by .mimir/** unless the
-#                                       user overrides to outside .mimir/)
-#   OUT of scope: anything else (Mimir does not write outside .mimir/ +
+#   IN scope:    .lorgen/**/*  except  .lorgen/logs/**, .lorgen/cache/**
+#                <outputs.adr_dir>/**  (default .lorgen/adr/, already
+#                                       covered by .lorgen/** unless the
+#                                       user overrides to outside .lorgen/)
+#   OUT of scope: anything else (Lorgen does not write outside .lorgen/ +
 #                <outputs.adr_dir> by spec; we don't try to police the
 #                rest of the user's repo).
 
@@ -35,21 +35,21 @@ fi
 # Code may invoke the hook from any cwd (subdirectory, symlinked path,
 # during a sub-shell). $CLAUDE_PROJECT_DIR is provided by Claude Code
 # 2.x for plugins. Fall back to walking up from $PWD looking for
-# .mimir/, then to $PWD as a last resort.
+# .lorgen/, then to $PWD as a last resort.
 project_dir="${CLAUDE_PROJECT_DIR:-}"
 if [[ -z "$project_dir" ]]; then
   d="$PWD"
   while [[ "$d" != "/" && "$d" != "" ]]; do
-    if [[ -d "$d/.mimir" ]]; then project_dir="$d"; break; fi
+    if [[ -d "$d/.lorgen" ]]; then project_dir="$d"; break; fi
     d="$(dirname "$d")"
   done
   : "${project_dir:=$PWD}"
 fi
 
-# Lazy resolve adr_dir from <project_dir>/.mimir/config.yaml (no yaml
+# Lazy resolve adr_dir from <project_dir>/.lorgen/config.yaml (no yaml
 # parser dependency — regex pull, robust to comments).
-adr_dir=".mimir/adr"
-if [[ -f "$project_dir/.mimir/config.yaml" ]]; then
+adr_dir=".lorgen/adr"
+if [[ -f "$project_dir/.lorgen/config.yaml" ]]; then
   cfg_adr_dir=$(awk '
     /^outputs:/      { in_outputs=1; next }
     /^[a-zA-Z]/      { in_outputs=0 }
@@ -59,7 +59,7 @@ if [[ -f "$project_dir/.mimir/config.yaml" ]]; then
       print
       exit
     }
-  ' "$project_dir/.mimir/config.yaml")
+  ' "$project_dir/.lorgen/config.yaml")
   if [[ -n "$cfg_adr_dir" ]]; then
     adr_dir="$cfg_adr_dir"
   fi
@@ -74,7 +74,7 @@ fi
 if [[ "$adr_dir" == *..* ]] || [[ "$adr_dir" == /* ]] \
    || [[ "$adr_dir" == *'*'* ]] || [[ "$adr_dir" == *'?'* ]] \
    || [[ "$adr_dir" == *'['* ]]; then
-  echo "🚫 Mimir refused: outputs.adr_dir contains a suspicious value: $adr_dir" >&2
+  echo "🚫 Lorgen refused: outputs.adr_dir contains a suspicious value: $adr_dir" >&2
   exit 2
 fi
 
@@ -85,12 +85,12 @@ if command -v jq >/dev/null 2>&1; then
   file_path=$(printf '%s' "$input" | jq -r '.tool_input.file_path // empty')
   content=$(printf '%s' "$input" | jq -r '.tool_input.content // .tool_input.new_string // empty')
 else
-  # Fail-open if jq is missing (rare). The `mimir-redact` wrapper
+  # Fail-open if jq is missing (rare). The `lorgen-redact` wrapper
   # used by skill bash snippets remains as defence. Surface the
   # missing dependency to stderr — symmetric with how
-  # mimir-redact-check warns when perl is missing — so the gap is
+  # lorgen-redact-check warns when perl is missing — so the gap is
   # visible rather than silent.
-  echo "⚠️  Mimir warning: jq not found; PreToolUse guard skipped." >&2
+  echo "⚠️  Lorgen warning: jq not found; PreToolUse guard skipped." >&2
   exit 0
 fi
 
@@ -116,28 +116,28 @@ fi
 # matching mechanical backstop. (NUL is unrepresentable in bash
 # strings — `read` / `cat` truncate at NUL — so no separate check.)
 if [[ "$rel" == *..* ]] || [[ "$rel" == *\\* ]]; then
-  echo "🚫 Mimir refused: file_path contains a forbidden segment (.. or \\): $file_path" >&2
+  echo "🚫 Lorgen refused: file_path contains a forbidden segment (.. or \\): $file_path" >&2
   exit 2
 fi
 
 # If the path is still absolute after stripping, it lives outside the
-# project root. Mimir's writes are always project-relative; reject.
+# project root. Lorgen's writes are always project-relative; reject.
 if [[ "$rel" == /* ]]; then
-  exit 0  # out of scope, not Mimir's territory
+  exit 0  # out of scope, not Lorgen's territory
 fi
 
 in_scope=0
 
-# .mimir/** but NOT .mimir/logs/** or .mimir/cache/**
-if [[ "$rel" == .mimir/* ]] \
-  && [[ "$rel" != .mimir/logs/* ]] \
-  && [[ "$rel" != .mimir/cache/* ]]; then
+# .lorgen/** but NOT .lorgen/logs/** or .lorgen/cache/**
+if [[ "$rel" == .lorgen/* ]] \
+  && [[ "$rel" != .lorgen/logs/* ]] \
+  && [[ "$rel" != .lorgen/cache/* ]]; then
   in_scope=1
 fi
 
 # Configured ADR dir (only matters if user overrode outputs.adr_dir
-# to a path outside .mimir/; default .mimir/adr is already covered
-# by the .mimir/** rule above).
+# to a path outside .lorgen/; default .lorgen/adr is already covered
+# by the .lorgen/** rule above).
 if [[ "$rel" == "$adr_dir"/* ]]; then
   in_scope=1
 fi
@@ -149,4 +149,4 @@ fi
 # Pipe content through redact-check. If it exits non-zero, Claude Code
 # blocks the tool call and surfaces stderr to the model.
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-printf '%s' "$content" | "$script_dir/mimir-redact-check"
+printf '%s' "$content" | "$script_dir/lorgen-redact-check"

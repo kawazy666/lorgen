@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# bin/mimir-redact
+# bin/lorgen-redact
 #
 # Reads stdin, replaces known secret patterns with `[REDACTED:<kind>]`
 # markers, writes to stdout. Used as a pipe before any append into a
-# tracked Mimir file (Knowledge / Wiki / ADR body, ADR file).
+# tracked Lorgen file (Knowledge / Wiki / ADR body, ADR file).
 #
-# Same pattern set as `mimir-redact-check`. The check version aborts;
+# Same pattern set as `lorgen-redact-check`. The check version aborts;
 # this version rewrites. Use the check as the hook gate, this as the
 # defensive wrapper.
 
@@ -17,7 +17,7 @@ set -u
 # fall through to `cat` and ship secrets verbatim.
 if ! command -v perl >/dev/null 2>&1; then
   # Defense-in-depth: pass through unchanged. The PreToolUse hook
-  # `mimir-redact-check` is the safety net and uses the same
+  # `lorgen-redact-check` is the safety net and uses the same
   # pattern set in grep ERE form, so leaks caught there will still
   # block the write.
   exec cat

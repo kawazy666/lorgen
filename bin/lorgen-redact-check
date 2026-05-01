@@ -1,23 +1,23 @@
 #!/usr/bin/env bash
-# bin/mimir-redact-check
+# bin/lorgen-redact-check
 #
 # Scans stdin for known secret patterns. Exits 0 if clean, 1 if any
-# pattern matched. Used by Mimir's PreToolUse hook to refuse Write/Edit
+# pattern matched. Used by Lorgen's PreToolUse hook to refuse Write/Edit
 # operations that would commit a secret to a tracked file.
 #
 # Bypass via env var (escape hatch for legitimate documentation):
-#   MIMIR_REDACT_BYPASS=1
+#   LORGEN_REDACT_BYPASS=1
 #
 # Implementation note: uses perl, not grep. Earlier versions gated on
 # `grep -P` availability, which is false on macOS BSD grep — that path
 # silently degraded the pattern set. perl is universally available
 # (macOS / Linux ship it; Claude Code containers include it). The
-# pattern set must stay in lock-step with bin/mimir-redact.
+# pattern set must stay in lock-step with bin/lorgen-redact.
 
 set -u
 
 # Bypass for legitimate cases (e.g. user explicitly documents an example key).
-if [[ "${MIMIR_REDACT_BYPASS:-0}" == "1" ]]; then
+if [[ "${LORGEN_REDACT_BYPASS:-0}" == "1" ]]; then
   cat >/dev/null  # drain stdin
   exit 0
 fi
@@ -26,12 +26,12 @@ if ! command -v perl >/dev/null 2>&1; then
   # If perl is missing the wrapper falls through too. Fail open
   # rather than block legitimate writes — but log a warning so the
   # missing dependency surfaces.
-  echo "⚠️  Mimir warning: perl not found; secret-pattern check skipped." >&2
+  echo "⚠️  Lorgen warning: perl not found; secret-pattern check skipped." >&2
   cat >/dev/null
   exit 0
 fi
 
-# Each entry is "label||pattern". Patterns mirror bin/mimir-redact —
+# Each entry is "label||pattern". Patterns mirror bin/lorgen-redact —
 # keep them in sync. Delimiter `||` keeps labels human-readable in
 # the failure message.
 PATTERNS=(
@@ -71,15 +71,15 @@ for entry in "${PATTERNS[@]}"; do
   # Pass the pattern via env to avoid quoting hell and to keep perl's
   # regex delimiter (`m{...}`) free from collision with `/`, `!`,
   # `,` etc. that may appear in the pattern body.
-  if printf '%s' "$content" | MIMIR_PAT="$pattern" perl -ne '
-      BEGIN { $hit = 0; $pat = $ENV{MIMIR_PAT}; }
+  if printf '%s' "$content" | LORGEN_PAT="$pattern" perl -ne '
+      BEGIN { $hit = 0; $pat = $ENV{LORGEN_PAT}; }
       $hit = 1 if /$pat/;
       END { exit ($hit ? 0 : 1) }
     '; then
     cat <<EOF >&2
-🚫 Mimir refused: detected secret-like pattern (kind: $label)
+🚫 Lorgen refused: detected secret-like pattern (kind: $label)
    - Redact the value before retrying, or
-   - Set MIMIR_REDACT_BYPASS=1 if this match is a legitimate false positive
+   - Set LORGEN_REDACT_BYPASS=1 if this match is a legitimate false positive
      (e.g. documenting an example, not a real credential).
 EOF
     exit 1

@@ -9,19 +9,19 @@ sources:
   - {type: code, path: ".claude-plugin/plugin.json"}
 ---
 
-# Decision — package Mimir as a Claude Code plugin
+# Decision — package Lorgen as a Claude Code plugin
 
 ## What
 
 We moved from "standalone subagent + `install.sh` symlinking into
 `.claude/`" to a proper Claude Code plugin (`.claude-plugin/plugin.json`,
-`agents/`, `skills/mimir/` at repo root). Distribution is now via
-`/plugin install mimir@<github-url>`.
+`agents/`, `skills/lorgen/` at repo root). Distribution is now via
+`/plugin install lorgen@<github-url>`.
 
 ## Why
 
 1. **One-command install** — users run `/plugin install` and Claude Code
-   handles file placement under `.claude/plugins/mimir/`. No manual
+   handles file placement under `.claude/plugins/lorgen/`. No manual
    `cp -r` + `bash install.sh` ritual.
 2. **Auto-update** — Claude Code 2.0.70+ auto-updates plugins on
    startup, so improvements reach users without manual re-copy.
@@ -31,9 +31,9 @@ We moved from "standalone subagent + `install.sh` symlinking into
    community marketplaces (`anthropics/claude-plugins-official` etc.)
    and reach users we don't know about.
 5. **Cleaner separation** — plugin source (`agents/`, `skills/`) is
-   distinct from data store (`.mimir/`). Plugin lives in
-   `~/.claude/plugins/mimir/` (global) or `<repo>/.claude/plugins/mimir/`
-   (project install); user repos only need `.mimir/` for accumulated
+   distinct from data store (`.lorgen/`). Plugin lives in
+   `~/.claude/plugins/lorgen/` (global) or `<repo>/.claude/plugins/lorgen/`
+   (project install); user repos only need `.lorgen/` for accumulated
    knowledge.
 
 ## Trade-off accepted
@@ -43,18 +43,18 @@ We moved from "standalone subagent + `install.sh` symlinking into
   shipped widely before this pivot.
 - **Standalone subagent install path is gone** — repos that previously
   used `cp -r .tim/` + `install.sh` (the prior structure) need to
-  migrate to `/plugin install`. Their accumulated `.mimir/knowledge/`
-  and `.mimir/wiki/` data are unaffected, only the install workflow
+  migrate to `/plugin install`. Their accumulated `.lorgen/knowledge/`
+  and `.lorgen/wiki/` data are unaffected, only the install workflow
   changes.
 
 ## What changed in this repo
 
-- `.tim/agent/tim.md` → `agents/mimir.md`
-- `.tim/skill/*.md` → `skills/mimir/*.md`
+- `.tim/agent/tim.md` → `agents/lorgen.md`
+- `.tim/skill/*.md` → `skills/lorgen/*.md`
 - `.tim/install.sh`, `.tim/uninstall.sh` → deleted (`/plugin install` /
   `/plugin remove` replace them)
 - New: `.claude-plugin/plugin.json`
-- `.tim/` → `.mimir/` (data store rename, content preserved)
+- `.tim/` → `.lorgen/` (data store rename, content preserved)
 
 ## Where to read more
 

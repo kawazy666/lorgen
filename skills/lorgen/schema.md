@@ -1,13 +1,13 @@
-# `.mimir/` schema
+# `.lorgen/` schema
 
 Authoritative spec for the directory layout, file front-matter, and
-configuration keys. **Read this before reading or writing any `.mimir/` file.**
+configuration keys. **Read this before reading or writing any `.lorgen/` file.**
 
 ## Directory layout
 
 ```
 <repo-root>/
-└── .mimir/
+└── .lorgen/
     ├── config.yaml             # tracked
     ├── .gitignore              # tracked, excludes cache/ + logs/ + state.json
     ├── knowledge/              # tracked — small, trigger-retrievable items
@@ -32,7 +32,7 @@ configuration keys. **Read this before reading or writing any `.mimir/` file.**
     └── state.json              # ignored — onboarding cursor, last-scanned commits
 ```
 
-What goes in `.mimir/.gitignore` (write this exact content):
+What goes in `.lorgen/.gitignore` (write this exact content):
 
 ```
 cache/
@@ -53,7 +53,7 @@ contract.
 
 ## Knowledge item — front-matter schema
 
-`.mimir/knowledge/<category>/<slug>.md`
+`.lorgen/knowledge/<category>/<slug>.md`
 
 ```markdown
 ---
@@ -64,7 +64,7 @@ tags: [money, billing]
 sources:
   - {type: pr, ref: "#42", url: "https://github.com/owner/repo/pull/42"}
   - {type: commit, ref: "abc1234", url: "https://github.com/owner/repo/commit/abc1234"}
-  - {type: adr, path: ".mimir/adr/0003-decimal.md"}
+  - {type: adr, path: ".lorgen/adr/0003-decimal.md"}
 created: 2026-04-29
 updated: 2026-04-29
 ---
@@ -85,7 +85,7 @@ PR #42 で `src/billing/` 全体を Decimal に移行。test では
 | `trigger` | yes | string | Comma-separated phrases / keywords. Used by retrieval to decide whether this item is relevant. Make it specific enough to match real queries. |
 | `kind` | yes | enum | `convention` \| `decision` \| `runbook` \| `fact` \| `lesson`. Determines default category folder. |
 | `scope` | yes | enum | `repo` (default — only relevant in this repo) or `global` (general lesson, repo-agnostic). |
-| `tags` | no | list[string] | Free-form. Used for grouping in `mimir wiki`-style summaries. |
+| `tags` | no | list[string] | Free-form. Used for grouping in `lorgen wiki`-style summaries. |
 | `sources` | yes (≥1) | list[object] | Each source has `type` ∈ `pr` / `issue` / `commit` / `adr` / `code` / `user-record` / `notion`, plus `ref`/`path`/`url`/`line` as appropriate. |
 | `created` | yes | ISO date | First write date. |
 | `updated` | yes | ISO date | Last write date. Update whenever the item is edited. |
@@ -126,7 +126,7 @@ issue bodies) are validated before any `Write` call. See `accumulation.md`
 
 ## Wiki page — front-matter schema
 
-`.mimir/wiki/<area>.md` (or `wiki/<parent>/<child>.md` for nested pages)
+`.lorgen/wiki/<area>.md` (or `wiki/<parent>/<child>.md` for nested pages)
 
 ```markdown
 ---
@@ -145,13 +145,13 @@ updated: 2026-04-29
 |---|---|---|---|
 | `title` | yes | string | Human-readable page title. |
 | `parent` | no | string | Slug of the parent page. Omit for top-level. |
-| `summary` | no | string | One-line description, used by `mimir wiki list`. |
+| `summary` | no | string | One-line description, used by `lorgen wiki list`. |
 | `updated` | yes | ISO date | Last regeneration / hand-edit date. |
 
 ### Page links
 
 In Wiki body, link to Knowledge items using their relative paths from
-`.mimir/`:
+`.lorgen/`:
 
 ```markdown
 See [convention: Decimal for money](../knowledge/conventions/decimal-money.md)
@@ -160,7 +160,7 @@ for the rationale.
 
 This makes `git grep` and editor jump-to-file work.
 
-## `.mimir/config.yaml` — schema
+## `.lorgen/config.yaml` — schema
 
 ```yaml
 # Tracked in git. Team-shared settings.
@@ -178,7 +178,7 @@ sources:
     pr_lookback_days: 30
     pr_lookback_count: 50
   adr_dirs:
-    - .mimir/adr
+    - .lorgen/adr
     - docs/adr
     - docs/decisions
   # notion:                    # roadmap, not yet wired
@@ -187,10 +187,10 @@ sources:
 
 outputs:
   write_adr: false             # auto-mirror every decision Knowledge as an ADR
-  adr_dir: .mimir/adr          # destination when ADRs are written
+  adr_dir: .lorgen/adr          # destination when ADRs are written
 
 wiki:
-  # Steering for `mimir onboard` / wiki refresh.
+  # Steering for `lorgen onboard` / wiki refresh.
   repo_notes: []
   pages: []
 ```
@@ -204,30 +204,30 @@ wiki:
 | `sources.code_comments` | bool | `true` | Enable TODO/FIXME/HACK/why: scanner. |
 | `sources.github.enabled` | bool | `true` | Enable `gh` CLI for PR/issue. Disable on repos without GitHub remote. |
 | `sources.github.repo` | string | (auto) | `owner/name`. Auto-detected from `git remote get-url origin` when unset. |
-| `sources.github.pr_lookback_days` | int | `30` | Default `mimir onboard` window. |
+| `sources.github.pr_lookback_days` | int | `30` | Default `lorgen onboard` window. |
 | `sources.github.pr_lookback_count` | int | `50` | Cap on PR count per onboard run. |
-| `sources.adr_dirs` | list | `[.mimir/adr, docs/adr, docs/decisions]` | Directories to scan for ADR Markdown. |
-| `outputs.write_adr` | bool | `false` | When `true`, every `decision`-kind Knowledge Mimir writes is auto-mirrored as an ADR file at `outputs.adr_dir`. When `false`, ADRs are written only on per-record opt-in. |
-| `outputs.adr_dir` | string | `.mimir/adr` | Where ADR files go when written. Override to a project-wide convention (e.g. `docs/adr`, `docs/decisions`) if you prefer ADRs to live alongside the rest of `docs/`. |
-| `wiki.repo_notes` | list[string] | `[]` | Free-form notes that steer `mimir onboard` wiki generation (à la `.devin/wiki.json`). |
+| `sources.adr_dirs` | list | `[.lorgen/adr, docs/adr, docs/decisions]` | Directories to scan for ADR Markdown. |
+| `outputs.write_adr` | bool | `false` | When `true`, every `decision`-kind Knowledge Lorgen writes is auto-mirrored as an ADR file at `outputs.adr_dir`. When `false`, ADRs are written only on per-record opt-in. |
+| `outputs.adr_dir` | string | `.lorgen/adr` | Where ADR files go when written. Override to a project-wide convention (e.g. `docs/adr`, `docs/decisions`) if you prefer ADRs to live alongside the rest of `docs/`. |
+| `wiki.repo_notes` | list[string] | `[]` | Free-form notes that steer `lorgen onboard` wiki generation (à la `.devin/wiki.json`). |
 | `wiki.pages` | list[object] | `[]` | Explicit `[{title, purpose, parent?}]` list of wiki pages to generate. When set, only these pages are produced. |
 
 ## ADR files (optional)
 
-Mimir can also write industry-standard ADR files at
-`.mimir/adr/NNNN-<slug>.md` (default; the canonical Mimir-curated
+Lorgen can also write industry-standard ADR files at
+`.lorgen/adr/NNNN-<slug>.md` (default; the canonical Lorgen-curated
 location) or wherever `outputs.adr_dir` points. **Off by default**;
-enabled per-record (`@mimir record --adr "..."`) or project-wide
+enabled per-record (`@lorgen record --adr "..."`) or project-wide
 (`outputs.write_adr: true` in `config.yaml`).
 
-ADR files default to inside `.mimir/` because they are Mimir-curated
+ADR files default to inside `.lorgen/` because they are Lorgen-curated
 artefacts; the team can override `outputs.adr_dir` to e.g. `docs/adr/`
 when they want ADRs surfaced alongside the rest of `docs/` (read by
-humans, code review tools, other ADR tooling). Mimir's role for ADRs:
+humans, code review tools, other ADR tooling). Lorgen's role for ADRs:
 
 - **Generate** new ADRs in MADR-lite format (Title / Status / Context /
   Decision / Consequences). Numbering auto-derived from existing files.
-- **Cross-link** with the corresponding `.mimir/knowledge/decisions/<slug>.md`
+- **Cross-link** with the corresponding `.lorgen/knowledge/decisions/<slug>.md`
   item so retrieval can find either side.
 - **Treat as immutable** — only edit existing ADRs to mark them
   `superseded by NNNN`; never rewrite the body.
@@ -235,27 +235,27 @@ humans, code review tools, other ADR tooling). Mimir's role for ADRs:
 Full generation rules: see `accumulation.md` → "Stage 5 (optional) — ADR
 mirror".
 
-## Audit log — `.mimir/logs/<YYYYMMDD>-<HHMMSS>-<invocation_id>.jsonl`
+## Audit log — `.lorgen/logs/<YYYYMMDD>-<HHMMSS>-<invocation_id>.jsonl`
 
-Append-only JSONL, one event per line, one file per Mimir invocation.
+Append-only JSONL, one event per line, one file per Lorgen invocation.
 Authoritative event-type schema lives in `logging.md` — read that file
 before writing any log line.
 
 **Raw logs are gitignored** (per the `.gitignore` snippet above); they
 contain query / candidate_summary / source content and stay per-machine.
-At the end of every invocation Mimir runs the metrics compile step
+At the end of every invocation Lorgen runs the metrics compile step
 (see `metrics.md`) which reads the log and emits a sanitised
-`.mimir/metrics/<session>.json` — that compiled file is what's tracked
+`.lorgen/metrics/<session>.json` — that compiled file is what's tracked
 in git and feeds the improvement loop (stale detection, hot-item
 promotion, trigger health).
 
-## Compiled metrics — `.mimir/metrics/<YYYYMMDD>-<HHMMSS>-<invocation_id>.json`
+## Compiled metrics — `.lorgen/metrics/<YYYYMMDD>-<HHMMSS>-<invocation_id>.json`
 
 Tracked. Per-session aggregate of the matching log file. Schema and
 compile contract (deterministic, idempotent, orphan-log handling)
 live in `metrics.md`.
 
-## `.mimir/state.json` — internal state
+## `.lorgen/state.json` — internal state
 
 ```json
 {
