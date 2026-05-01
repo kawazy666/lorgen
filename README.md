@@ -178,17 +178,24 @@ Lorgen は Devin の **Knowledge + DeepWiki** 機能に着想を得つつ、
 
 ## インストール
 
-```bash
-# プロジェクトローカル (プラグインは .claude/plugins/lorgen/ に配置)
-/plugin install lorgen@kawazy666/lorgen
+このリポジトリは **マーケットプレイス + プラグイン本体** を兼ねる単一
+リポジトリ構成。インストールは 2 ステップ:
 
-# ユーザーグローバル (~/.claude/plugins/lorgen/ に配置)
-/plugin install lorgen@kawazy666/lorgen --user
+```bash
+# 1. リポジトリをマーケットプレイスとして登録(初回のみ)
+/plugin marketplace add kawazy666/lorgen
+
+# 2. プラグインをインストール
+/plugin install lorgen@lorgen
+
+# (確認)
+/help                                # /lorgen:review が候補に出れば OK
 ```
 
-バージョン pin は `@v0.1.0` のように付与。最新追従はバージョンを
-省略 (現在のコミット SHA を使用)。fork / 自己公開する場合は
-`kawazy666/lorgen` を自分の GitHub `owner/repo` に置換。
+更新時は `/plugin marketplace update lorgen` でメタデータをリフレッシュ。
+バージョン pin が必要なら `/plugin marketplace add kawazy666/lorgen@v0.1.0`
+のようにブランチ/タグ指定。fork / 自己公開する場合は `kawazy666/lorgen`
+を自分の GitHub `owner/repo` に置換。
 
 インストール後、Claude Code を再起動 (または `/reload-plugins`) して
 新しい agent と skill を読み込ませる。次に任意のプロジェクトで:

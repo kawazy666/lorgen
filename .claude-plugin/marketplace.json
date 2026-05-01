@@ -1,0 +1,15 @@
+{
+  "name": "lorgen",
+  "owner": {
+    "name": "kawazy666"
+  },
+  "plugins": [
+    {
+      "name": "lorgen",
+      "source": "./",
+      "description": "Repository knowledge curator named after Lordgenome (Tengen Toppa Gurren Lagann). Captures the 'why' behind code as Markdown under .lorgen/ — design decisions, history, trade-offs, lessons. Plus a 4-role multi-agent Knowledge-grounded review via /lorgen:review.",
+      "category": "knowledge",
+      "keywords": ["knowledge", "documentation", "adr", "wiki", "review", "subagent"]
+    }
+  ]
+}

@@ -275,15 +275,21 @@ implementation.
 
 ## Distribution
 
-The plugin is published from this repo to GitHub. Users install with:
+The repo serves as **both** a Claude Code marketplace and the single
+plugin it lists. The marketplace manifest at
+`.claude-plugin/marketplace.json` declares one plugin entry with
+`source: "./"`, pointing at the repo root where `plugin.json` lives.
+
+Users install in two steps:
 
 ```
-/plugin install lorgen@kawazy666/lorgen
+/plugin marketplace add kawazy666/lorgen
+/plugin install lorgen@lorgen
 ```
 
 Auto-update is enabled by default (Claude Code 2.0.70+ feature). Users
-can pin to a `version` field in `plugin.json` (semver) or follow the
-HEAD commit SHA.
+can pin to a `version` field in `plugin.json` (semver), tag the marketplace
+add (`@v0.1.0`), or follow the HEAD commit SHA.
 
 A submodule-based "central Lorgen" was considered and rejected — plugin
 manager handles distribution and versioning natively, no need for git
