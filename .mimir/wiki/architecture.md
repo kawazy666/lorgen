@@ -12,8 +12,8 @@ alternatives considered lives in [`docs/architecture.md`](../../docs/architectur
 
 This Wiki page is a short pointer + index. For a Mimir-using codebase
 **the architecture decisions belong in Knowledge `decisions/` and ADR
-files in `docs/adr/`**, not here — Wiki pages are summaries / indexes,
-not the source of truth.
+files under `outputs.adr_dir`** (default `.mimir/adr/`), not here —
+Wiki pages are summaries / indexes, not the source of truth.
 
 ## Key decisions (links into the canonical record)
 

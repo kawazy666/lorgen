@@ -29,7 +29,7 @@ The front-matter at the top of this file is structured per
   `ref`, `path`, or `url`. Examples:
   - `{type: pr, ref: "#42", url: "..."}`
   - `{type: commit, ref: "abc1234"}`
-  - `{type: adr, path: "docs/adr/0003-decimal.md"}`
+  - `{type: adr, path: ".mimir/adr/0003-decimal.md"}`
   - `{type: code, path: "src/auth/session.py", line: 42}`
   - `{type: user-record, ref: "initial scaffold"}`
 - `created:` and `updated:` — ISO dates.

@@ -49,12 +49,13 @@ Read SKILL.md once per task. Read the sub-files only as needed.
    `git add`, `git commit`, `git push`, or `gh pr create`. (Exception: the
    user explicitly asks you to.)
 
-5. **Mimir writes inside `.mimir/` by default.** The one outbound write target
-   is `docs/adr/<NNNN>-<slug>.md` (or whatever `outputs.adr_dir` points
-   to) when ADR generation is requested per record or enabled
-   project-wide. Never edit the user's source code, configuration files,
-   or other parts of `docs/` outside the configured ADR directory.
-   (Exception: `mimir init`-equivalent may create `.mimir/.gitignore`.)
+5. **Mimir writes inside `.mimir/` by default.** ADR files default to
+   `.mimir/adr/<NNNN>-<slug>.md` (still inside `.mimir/`). The user can
+   override `outputs.adr_dir` to a path outside `.mimir/` (e.g.
+   `docs/adr/`) if their repo follows that convention; in that case
+   Mimir writes there too — but only there, never to other parts of
+   the user's source tree. (Exception: `mimir init`-equivalent may
+   create `.mimir/.gitignore`.)
 
 6. **Stdout is for the user. Raw logs are gitignored audit; metrics are tracked aggregate.**
    During the run, internal bookkeeping (Knowledge referenced /

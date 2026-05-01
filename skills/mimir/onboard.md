@@ -119,8 +119,9 @@ Always:
    - `CONTRIBUTING.md` (sections about code style / conventions)
    - `README.md` (sections like "design principles", "trade-offs")
 
-4. **Knowledge from existing ADRs** — for each `docs/adr/*.md` /
-   `docs/decisions/*.md`, create a `decision`-kind Knowledge item with
+4. **Knowledge from existing ADRs** — for each ADR file under
+   `sources.adr_dirs` (default `.mimir/adr/`, `docs/adr/`,
+   `docs/decisions/`), create a `decision`-kind Knowledge item with
    `sources: [{type: adr, path: ...}]`. Skip if already covered.
 
 5. **Knowledge from recent PRs** — apply the accumulation pipeline to
@@ -136,10 +137,12 @@ Optional (off by default — opt-in via `wiki.pages` in config):
 
 8. **ADR scaffolding** — if `.mimir/config.yaml` → `outputs.write_adr: true`,
    any new `decision`-kind Knowledge produced by onboard is mirrored
-   into `docs/adr/NNNN-<slug>.md` per `accumulation.md` → "Stage 5".
-   If `outputs.adr_dir` doesn't exist yet, create it. Always inform the
-   user when this happens — adding an `adr/` directory to a repo that
-   didn't have one is a meaningful structural change worth surfacing.
+   into `<outputs.adr_dir>/NNNN-<slug>.md` (default `.mimir/adr/`) per
+   `accumulation.md` → "Stage 5". If the directory doesn't exist yet,
+   create it. When `outputs.adr_dir` points outside `.mimir/` (e.g.
+   `docs/adr/`), inform the user — adding a top-level `adr/` directory
+   to a repo that didn't have one is a meaningful structural change
+   worth surfacing.
 
 ## Quick mode (`--quick` semantics)
 

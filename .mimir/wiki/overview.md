@@ -45,11 +45,11 @@ This Wiki page is the top-level entry. Drill into:
 | `cache/` | no | Source / LLM response caches |
 | `state.json` | no | Onboard cursor, indexing state |
 
-### ADR mirror (outside `.mimir/`)
+### ADR mirror
 
 | Path | Tracked? | What |
 |---|---|---|
-| `docs/adr/<NNNN>-<slug>.md` | yes | Optional ADR mirrors of `decision`-kind Knowledge. Off by default; enable per record (`@mimir record --adr ...`) or globally (`outputs.write_adr: true`). |
+| `.mimir/adr/<NNNN>-<slug>.md` | yes | Optional ADR mirrors of `decision`-kind Knowledge. Default location (Mimir-curated, lives inside `.mimir/`). Off by default; enable per record (`@mimir record --adr ...`) or globally (`outputs.write_adr: true`). Override `outputs.adr_dir` to e.g. `docs/adr/` if your repo follows that convention. |
 
 ## Reading order for a new contributor
 

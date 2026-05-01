@@ -14,6 +14,7 @@ sources:
     pr_lookback_days: 30
     pr_lookback_count: 50
   adr_dirs:
+    - .mimir/adr
     - docs/adr
     - docs/decisions
   # notion:                      # roadmap, not yet wired
@@ -26,7 +27,7 @@ outputs:
   # ADR file at outputs.adr_dir. Off by default; users can opt in per-record
   # via "@mimir record --adr ..." regardless of this setting.
   write_adr: false
-  adr_dir: docs/adr
+  adr_dir: .mimir/adr
 
 wiki:
   repo_notes:

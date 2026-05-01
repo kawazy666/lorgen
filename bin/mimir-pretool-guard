@@ -14,11 +14,12 @@
 #
 # Scope: glob-negation form.
 #   IN scope:    .mimir/**/*  except  .mimir/logs/**, .mimir/cache/**
-#                <outputs.adr_dir>/**  (default docs/adr/, configurable)
-#                docs/decisions/**     (always, since sources.adr_dirs lists it)
+#                <outputs.adr_dir>/**  (default .mimir/adr/, already
+#                                       covered by .mimir/** unless the
+#                                       user overrides to outside .mimir/)
 #   OUT of scope: anything else (Mimir does not write outside .mimir/ +
-#                ADR dirs by spec; we don't try to police the rest of
-#                the user's repo).
+#                <outputs.adr_dir> by spec; we don't try to police the
+#                rest of the user's repo).
 
 set -u
 
@@ -47,7 +48,7 @@ fi
 
 # Lazy resolve adr_dir from <project_dir>/.mimir/config.yaml (no yaml
 # parser dependency — regex pull, robust to comments).
-adr_dir="docs/adr"
+adr_dir=".mimir/adr"
 if [[ -f "$project_dir/.mimir/config.yaml" ]]; then
   cfg_adr_dir=$(awk '
     /^outputs:/      { in_outputs=1; next }
@@ -134,8 +135,10 @@ if [[ "$rel" == .mimir/* ]] \
   in_scope=1
 fi
 
-# Configured ADR dir
-if [[ "$rel" == "$adr_dir"/* ]] || [[ "$rel" == docs/decisions/* ]]; then
+# Configured ADR dir (only matters if user overrode outputs.adr_dir
+# to a path outside .mimir/; default .mimir/adr is already covered
+# by the .mimir/** rule above).
+if [[ "$rel" == "$adr_dir"/* ]]; then
   in_scope=1
 fi
 

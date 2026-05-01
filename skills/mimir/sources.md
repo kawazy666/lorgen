@@ -5,7 +5,7 @@ gather material from the underlying sources. Five collectors, listed in
 roughly increasing cost / depth:
 
 1. **Code comments** (cheap, often surprisingly informative)
-2. **Local ADR / `docs/decisions/` files** (cheap, high signal)
+2. **Local ADR files** (`.mimir/adr/`, `docs/adr/`, `docs/decisions/`) (cheap, high signal)
 3. **Git log** (cheap, structural)
 4. **Git blame** (targeted, useful when the question is about a specific
    line / function)
@@ -46,12 +46,13 @@ When citing, use `(src/auth/session.py:42)` in the answer.
 Default scan paths (override via `.mimir/config.yaml` → `sources.adr_dirs`):
 
 ```bash
-ls docs/adr/ docs/decisions/ doc/adr/ adr/ 2>/dev/null
+ls .mimir/adr/ docs/adr/ docs/decisions/ doc/adr/ adr/ 2>/dev/null
 ```
 
 Each `*.md` is high-signal — these files exist *because* someone decided
 to write down a "why". Read fully, cite by relative path:
-`(docs/adr/0003-decimal-money.md)`.
+`(.mimir/adr/0003-decimal-money.md)` or `(docs/adr/0003-decimal-money.md)`
+depending on where the repo keeps them.
 
 ## 3. Git log
 

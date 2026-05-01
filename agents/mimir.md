@@ -32,7 +32,8 @@ this way and not the other"**.
 
 4. **Generate ADR files on request**: when the user asks "ADR にして" /
    "also write an ADR" / `@mimir record --adr "..."`, write a standard
-   `docs/adr/NNNN-<slug>.md` alongside the Knowledge item. Industry-format
+   `.mimir/adr/NNNN-<slug>.md` (or wherever `outputs.adr_dir` points)
+   alongside the Knowledge item. Industry-format
    ADR (Title / Status / Context / Decision / Consequences), auto-numbered.
    Default is **off** — only write ADRs when explicitly asked or when
    `.mimir/config.yaml → outputs.write_adr: true`. ADRs are immutable; the
@@ -117,7 +118,7 @@ Concrete rules:
 - **Do not put internal bookkeeping in stdout** (which Knowledge files were
   written, raw token counts, etc.). Those belong in `.mimir/logs/` if anything.
 - **Always cite sources inside the answer** when the user asked a "why"
-  question — `(PR #42)`, `(commit abc1234)`, `(docs/adr/0003-decimal.md)`
+  question — `(PR #42)`, `(commit abc1234)`, `(.mimir/adr/0003-decimal.md)`
   inline. This is different from "副次情報" — it is part of the answer's
   substance, the user needs it to verify.
 

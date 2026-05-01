@@ -64,7 +64,7 @@ tags: [money, billing]
 sources:
   - {type: pr, ref: "#42", url: "https://github.com/owner/repo/pull/42"}
   - {type: commit, ref: "abc1234", url: "https://github.com/owner/repo/commit/abc1234"}
-  - {type: adr, path: "docs/adr/0003-decimal.md"}
+  - {type: adr, path: ".mimir/adr/0003-decimal.md"}
 created: 2026-04-29
 updated: 2026-04-29
 ---
@@ -178,6 +178,7 @@ sources:
     pr_lookback_days: 30
     pr_lookback_count: 50
   adr_dirs:
+    - .mimir/adr
     - docs/adr
     - docs/decisions
   # notion:                    # roadmap, not yet wired
@@ -186,7 +187,7 @@ sources:
 
 outputs:
   write_adr: false             # auto-mirror every decision Knowledge as an ADR
-  adr_dir: docs/adr            # destination when ADRs are written
+  adr_dir: .mimir/adr          # destination when ADRs are written
 
 wiki:
   # Steering for `mimir onboard` / wiki refresh.
@@ -205,22 +206,24 @@ wiki:
 | `sources.github.repo` | string | (auto) | `owner/name`. Auto-detected from `git remote get-url origin` when unset. |
 | `sources.github.pr_lookback_days` | int | `30` | Default `mimir onboard` window. |
 | `sources.github.pr_lookback_count` | int | `50` | Cap on PR count per onboard run. |
-| `sources.adr_dirs` | list | `[docs/adr, docs/decisions]` | Directories to scan for ADR Markdown. |
+| `sources.adr_dirs` | list | `[.mimir/adr, docs/adr, docs/decisions]` | Directories to scan for ADR Markdown. |
 | `outputs.write_adr` | bool | `false` | When `true`, every `decision`-kind Knowledge Mimir writes is auto-mirrored as an ADR file at `outputs.adr_dir`. When `false`, ADRs are written only on per-record opt-in. |
-| `outputs.adr_dir` | string | `docs/adr` | Where ADR files go when written. |
+| `outputs.adr_dir` | string | `.mimir/adr` | Where ADR files go when written. Override to a project-wide convention (e.g. `docs/adr`, `docs/decisions`) if you prefer ADRs to live alongside the rest of `docs/`. |
 | `wiki.repo_notes` | list[string] | `[]` | Free-form notes that steer `mimir onboard` wiki generation (à la `.devin/wiki.json`). |
 | `wiki.pages` | list[object] | `[]` | Explicit `[{title, purpose, parent?}]` list of wiki pages to generate. When set, only these pages are produced. |
 
-## ADR files (optional, written outside `.mimir/`)
+## ADR files (optional)
 
-Mimir can also write industry-standard ADR files at `docs/adr/NNNN-<slug>.md`
-(or wherever `outputs.adr_dir` points). **Off by default**; enabled
-per-record (`@mimir record --adr "..."`) or project-wide
+Mimir can also write industry-standard ADR files at
+`.mimir/adr/NNNN-<slug>.md` (default; the canonical Mimir-curated
+location) or wherever `outputs.adr_dir` points. **Off by default**;
+enabled per-record (`@mimir record --adr "..."`) or project-wide
 (`outputs.write_adr: true` in `config.yaml`).
 
-ADR files live **outside `.mimir/`** because they are part of the
-project's own documentation and are read by humans, code review tools,
-and any other ADR tooling. Mimir's role for ADRs:
+ADR files default to inside `.mimir/` because they are Mimir-curated
+artefacts; the team can override `outputs.adr_dir` to e.g. `docs/adr/`
+when they want ADRs surfaced alongside the rest of `docs/` (read by
+humans, code review tools, other ADR tooling). Mimir's role for ADRs:
 
 - **Generate** new ADRs in MADR-lite format (Title / Status / Context /
   Decision / Consequences). Numbering auto-derived from existing files.

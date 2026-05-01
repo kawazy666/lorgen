@@ -131,7 +131,7 @@ Aggregate by source type so the log stays compact.
     {"type": "git_log", "count": 12},
     {"type": "pr",       "refs": ["#42", "#43"]},
     {"type": "issue",    "refs": ["#37"]},
-    {"type": "adr",      "paths": ["docs/adr/0003-decimal.md"]},
+    {"type": "adr",      "paths": [".mimir/adr/0003-decimal.md"]},
     {"type": "code",     "paths": ["src/billing/calc.py:42"]}
   ]
 }
@@ -249,7 +249,7 @@ When ADR mirror writes a new ADR (per `accumulation.md` Stage 5).
   "ts": "...",
   "invocation_id": "a3f9c2",
   "event": "adr.created",
-  "path": "docs/adr/0001-decimal-money.md",
+  "path": ".mimir/adr/0001-decimal-money.md",
   "number": 1,
   "knowledge_path": ".mimir/knowledge/conventions/decimal-money.md"
 }
@@ -264,8 +264,8 @@ The single allowed mutation on existing ADRs (status change).
   "ts": "...",
   "invocation_id": "a3f9c2",
   "event": "adr.superseded",
-  "path": "docs/adr/0003-old-decision.md",
-  "superseded_by": "docs/adr/0007-new-decision.md"
+  "path": ".mimir/adr/0003-old-decision.md",
+  "superseded_by": ".mimir/adr/0007-new-decision.md"
 }
 ```
 

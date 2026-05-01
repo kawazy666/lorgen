@@ -22,6 +22,11 @@ The data Mimir curates lives in `.mimir/` inside each user repo:
 
 - `.mimir/knowledge/**/*.md` — small, trigger-retrievable Knowledge items (tracked)
 - `.mimir/wiki/**/*.md` — coarser per-area pages (tracked)
+- `.mimir/adr/<NNNN>-<slug>.md` — ADR mirrors of `decision`-kind
+  Knowledge, written only when `outputs.write_adr: true` or per-record
+  opt-in (tracked). Industry-standard MADR-lite format. Default
+  location; override via `outputs.adr_dir` if your repo follows a
+  different convention (e.g. `docs/adr/`, `docs/decisions/`).
 - `.mimir/config.yaml`, `.mimir/.gitignore` (tracked)
 - `.mimir/metrics/<YYYYMMDD>-<HHMMSS>-<id>.json` — per-session compiled
   aggregate (paths, counts, timestamps only) (tracked)
@@ -29,11 +34,6 @@ The data Mimir curates lives in `.mimir/` inside each user repo:
   trail (gitignored — contains query / source content with possible
   secrets; the compile step distills it into the tracked metrics)
 - `.mimir/{cache,state.json}/` — gitignored runtime data
-
-Plus, optionally outside `.mimir/`:
-
-- `docs/adr/<NNNN>-<slug>.md` — ADR mirrors of `decision`-kind Knowledge,
-  written only when `outputs.write_adr: true` or per-record opt-in (tracked)
 
 The two halves are physically separated:
 
@@ -104,8 +104,12 @@ Mimir writes files but does not run `git add` / `git commit` /
 - Keeps Mimir's tool surface minimal (no `gh` CLI dependency for the
   default install).
 
-The single allowed outbound write is `docs/adr/<NNNN>-<slug>.md`, when
-ADR generation is opted in (per-record or via `outputs.write_adr: true`).
+All Mimir writes stay under `.mimir/` by default, including ADR
+mirrors at `.mimir/adr/<NNNN>-<slug>.md` (when ADR generation is opted
+in per-record or via `outputs.write_adr: true`). Users can override
+`outputs.adr_dir` to point at a repo-existing ADR convention like
+`docs/adr/` if they prefer; the redaction guard then extends scope to
+that path automatically.
 
 ## Why ripgrep + LLM selection, not vector search
 

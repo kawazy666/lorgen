@@ -239,9 +239,9 @@ turns into the per-session aggregate that the Roadmap improvement loop
 
 ## Stage 5 (optional) — ADR mirror
 
-Most existing repos don't have `docs/adr/`. When the user wants
-discrete, immutable, industry-standard ADR files alongside Mimir's
-Knowledge items, Mimir writes them.
+Most existing repos don't have an `adr/` directory at all. When the
+user wants discrete, immutable, industry-standard ADR files alongside
+Mimir's Knowledge items, Mimir writes them.
 
 **Default: off.** Mimir writes only `.mimir/knowledge/decisions/<slug>.md`.
 
@@ -251,12 +251,14 @@ Knowledge items, Mimir writes them.
    `@mimir record --adr "..."`. Run only the ADR write for that one decision.
 2. **Project-level**: `.mimir/config.yaml` → `outputs.write_adr: true`. Every
    `decision`-kind Knowledge item Mimir writes (or updates with new
-   substance) is mirrored to `docs/adr/`.
+   substance) is mirrored to `<outputs.adr_dir>/`.
 
 ### Where
 
-`docs/adr/<NNNN>-<slug>.md` by default. Override via `.mimir/config.yaml` →
-`outputs.adr_dir` (e.g. `docs/decisions/`).
+`.mimir/adr/<NNNN>-<slug>.md` by default — keeps ADRs alongside the
+rest of Mimir's curated artefacts under `.mimir/`. Override via
+`.mimir/config.yaml` → `outputs.adr_dir` to a project-wide convention
+like `docs/adr/` or `docs/decisions/` if you prefer.
 
 If the directory doesn't exist, **create it** and tell the user in
 stdout — that's a normal first-time event for repos that haven't used
@@ -266,11 +268,11 @@ ADRs before.
 
 ```bash
 mimir_next_adr_number() {
-  local adr_dir="$1"   # from outputs.adr_dir, default docs/adr
+  local adr_dir="$1"   # from outputs.adr_dir, default .mimir/adr
   local max=0
 
   # Use find with strict 4-digit pattern. Anything outside [0-9]{4}-*.md
-  # is ignored (so an attacker injecting docs/adr/9999-evil.md or
+  # is ignored (so an attacker injecting .mimir/adr/9999-evil.md or
   # foo.md cannot poison numbering).
   while IFS= read -r f; do
     local base="${f##*/}"
@@ -374,7 +376,8 @@ sections.
 When you write an ADR, also update the linked Knowledge item:
 
 - In the Knowledge file's `sources:` list, add
-  `{type: adr, path: "docs/adr/NNNN-<slug>.md"}`.
+  `{type: adr, path: "<outputs.adr_dir>/NNNN-<slug>.md"}` (default
+  `.mimir/adr/NNNN-<slug>.md`).
 - Bump `updated:`.
 
 This makes the link bidirectional and lets Mimir retrieve from either side.
@@ -390,7 +393,7 @@ Not every Knowledge item is ADR-worthy:
   ask "why" about.
 
 When in doubt, write only the Knowledge item. ADR proliferation has its
-own failure mode (`docs/adr/` flooded with trivia).
+own failure mode (`<outputs.adr_dir>/` flooded with trivia).
 
 ## Wiki updates
 
