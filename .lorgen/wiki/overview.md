@@ -1,15 +1,21 @@
 ---
 title: Lorgen — overview
 summary: What this repo is, what's inside .lorgen/, and where to start reading.
-updated: 2026-04-29
+updated: 2026-05-02
 ---
 
 # Lorgen — overview
 
 Lorgen is a Claude Code plugin that captures and retrieves the **"why"**
-behind a codebase. The plugin's source (subagent + skill) lives at the
-repo root in `agents/` and `skills/lorgen/`. The data Lorgen curates as
-you use it lives in `.lorgen/`.
+behind a codebase. The plugin's source (subagent + review skill +
+slash command + hooks) lives at the repo root. The data Lorgen
+curates as you use it lives in `.lorgen/`.
+
+The repo doubles as a **Claude Code marketplace and the single plugin
+it lists** — install via `/plugin marketplace add kawazy666/lorgen`
+followed by `/plugin install lorgen@lorgen` (the right-hand
+`lorgen` is the marketplace name, not `owner/repo`). See
+[decisions/single-repo-marketplace-and-plugin.md](../knowledge/decisions/single-repo-marketplace-and-plugin.md).
 
 This Wiki page is the top-level entry. Drill into:
 
@@ -17,9 +23,10 @@ This Wiki page is the top-level entry. Drill into:
   that produced the current shape (pointer to `docs/architecture.md`).
 - **Knowledge index** — `.lorgen/knowledge/` is grouped by `kind`:
   - `conventions/` — rules the codebase follows
-  - `decisions/` — discrete choices with rationale
+  - `decisions/` — discrete choices with rationale (see recent: rename
+    Mimir→Lorgen, ADR location, review skill, 4-role team, marketplace)
   - `runbooks/` — operational know-how
-  - `facts/` — non-obvious context
+  - `facts/` — non-obvious context (see: aegis-comparison)
   - `lessons/` — generalizable insights, often from incidents
 
 ## Plugin source (this repo, not the data store)
@@ -27,10 +34,14 @@ This Wiki page is the top-level entry. Drill into:
 | Path | Tracked? | What |
 |---|---|---|
 | `.claude-plugin/plugin.json` | yes | Plugin manifest (name / version / etc.) |
+| `.claude-plugin/marketplace.json` | yes | Marketplace manifest pointing at this same repo as `source: "./"` |
 | `agents/lorgen.md` | yes | Subagent definition |
 | `skills/lorgen/*.md` | yes | Operating manual (multi-file skill, includes `metrics.md`) |
+| `skills/review/SKILL.md` | yes | Knowledge-grounded multi-agent code review skill (loaded by main agent, not the Lorgen subagent) |
+| `commands/review.md` | yes | `/lorgen:review` slash command — entry point for review |
 | `hooks/hooks.json` | yes | PreToolUse Write/Edit redaction guard |
 | `bin/lorgen-*` | yes | Pretool guard, redact check / wrapper, metrics compile |
+| `assets/logo.png` | yes | Project logo (Spiral Logic AI) shown in README header |
 
 ## Data store — `.lorgen/`
 
@@ -53,8 +64,15 @@ This Wiki page is the top-level entry. Drill into:
 
 ## Reading order for a new contributor
 
-1. `README.md` — what Lorgen is and how to install via `/plugin install`
-2. `docs/architecture.md` — why it's shaped this way
-3. `skills/lorgen/SKILL.md` — operating manual entry, with sub-files
-4. Browse `.lorgen/knowledge/` and `.lorgen/wiki/` to learn what Lorgen
-   itself has accumulated about this repo
+1. `README.md` — what Lorgen is and the 2-step install
+   (`/plugin marketplace add` → `/plugin install`)
+2. `docs/architecture.md` — why it's shaped this way (long-form,
+   alternatives considered)
+3. `skills/lorgen/SKILL.md` — operating manual entry for the curator
+   subagent, with sub-files (`schema`, `retrieval`, `accumulation`,
+   `sources`, `onboard`, `logging`, `metrics`)
+4. `skills/review/SKILL.md` — operating manual for the
+   `/lorgen:review` multi-agent review (Coordinator + Searcher +
+   parallel Investigators + Comparator)
+5. Browse `.lorgen/knowledge/decisions/` for the why-history of
+   Lorgen's own design (Lorgen dogfoods on itself)
